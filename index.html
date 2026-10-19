@@ -601,10 +601,11 @@ const CONFIG = {
   supabaseUrl: 'https://zguyhvdbaxmfshvwwywf.supabase.co',
   syncEndpoint: 'https://zguyhvdbaxmfshvwwywf.supabase.co/rest/v1/transactions?on_conflict=id',
   apiKey: 'sb_publishable_6z7hcOayCqJRd6R8fa7suQ_AA9IPmpn',
-  // Demo collector PINs. Replace with Supabase Auth sign-in before live use.
+  // Collector PINs are disabled (null) until Supabase Auth sign-in is in place.
+  // A collector with no PIN cannot sign in.
   collectors: [
-    { id: 'COL-8492', name: 'Collector 8492', pin: '1234' },
-    { id: 'COL-8411', name: 'Collector 8411', pin: '5678' }
+    { id: 'COL-8492', name: 'Collector 8492', pin: null },
+    { id: 'COL-8411', name: 'Collector 8411', pin: null }
   ]
 };
 
@@ -700,7 +701,7 @@ $('loginForm').addEventListener('submit', e => {
   const id = $('loginAgent').value.trim().toUpperCase();
   const pin = $('loginPin').value;
   const c = CONFIG.collectors.find(x => x.id === id);
-  if (!c || c.pin !== pin) {
+  if (!c || !c.pin || c.pin !== pin) {
     $('loginError').textContent = 'Incorrect agent ID or PIN.';
     return;
   }
