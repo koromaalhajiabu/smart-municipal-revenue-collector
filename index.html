@@ -691,13 +691,7 @@ const CONFIG = {
   apiKey: 'sb_publishable_6z7hcOayCqJRd6R8fa7suQ_AA9IPmpn',
 };
 
-/* Sample register, used only if the server register cannot be loaded. */
-let TAXPAYERS = [
-  { id: 'TP-0402', business: "Mabinty's General Store", stall: '402', owner: 'Mabinty Kamara', zone: 'Kissy Market', rate: 50000 },
-  { id: 'TP-0231', business: 'Fatmata Tailoring', stall: '231', owner: 'Fatmata Conteh', zone: 'Kissy Market', rate: 30000 },
-  { id: 'TP-0077', business: 'Kono Fresh Produce', stall: '77', owner: 'Ibrahim Kono', zone: 'Kissy Market', rate: 40000 },
-  { id: 'TP-0118', business: 'Alhaji Transport Hub', stall: '-', owner: 'Alhaji Sesay', zone: 'Central Station', rate: 120000 }
-];
+let TAXPAYERS = []; // loaded from Supabase after collector sign-in
 
 /* ---------- State and storage ---------- */
 const KEYS = { ledger: 'smc_ledger', session: 'smc_session', admin: 'smc_admin' };
@@ -784,6 +778,7 @@ $('loginForm').addEventListener('submit', async e => {
   try {
     const session = await signInCollector($('loginEmail').value.trim(), $('loginPassword').value);
     saveCollectorSession(session);
+    loadTaxpayers();
     $('loginForm').reset();
     $('loginError').textContent = '';
     showCollectorState();
@@ -1034,20 +1029,19 @@ async function loadServerLedger() {
 
 async function loadTaxpayers() {
   if (!navigator.onLine) return;
+  const token = await collectorAccessToken();
+  if (!token) return;
   try {
     const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/taxpayers?select=*&order=id.asc', {
-      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + CONFIG.apiKey }
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + token }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const rows = await res.json();
-    if (rows.length) {
-      TAXPAYERS = rows.map(r => ({
-        id: r.id, business: r.business, stall: r.stall, owner: r.owner,
-        zone: r.zone, rate: Number(r.standard_rate)
-      }));
-    }
+    TAXPAYERS = (await res.json()).map(r => ({
+      id: r.id, business: r.business, stall: r.stall, owner: r.owner,
+      zone: r.zone, rate: Number(r.standard_rate)
+    }));
   } catch (err) {
-    // keep the built-in sample register if the server cannot be reached
+    // keep the current list
   }
 }
 
