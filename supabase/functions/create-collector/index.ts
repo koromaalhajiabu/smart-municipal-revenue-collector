@@ -1,5 +1,8 @@
-// Creates a collector account. Only signed-in admins can call this.
-// It creates the Supabase Auth user (email and password) and links it to a collector record.
+// Collector management for admins. Only signed-in admins can call this.
+// Actions:
+//   create  - new sign-in account and collector record
+//   update  - change name, email, or password (blank password = unchanged)
+//   delete  - remove a collector. Refused if they have recorded payments; deactivate instead.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,19 +21,28 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function serviceHeaders() {
+function serviceHeaders(extra: Record<string, string> = {}) {
   return {
     apikey: SERVICE_KEY,
     Authorization: `Bearer ${SERVICE_KEY}`,
     "Content-Type": "application/json",
+    ...extra,
   };
+}
+
+function validEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validId(id: string) {
+  return /^COL-\d{3,6}$/.test(id);
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  // 1. Identify the caller from their access token.
+  // 1. Identify the caller.
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "Please sign in as an admin." }, 401);
 
@@ -46,54 +58,141 @@ Deno.serve(async (req) => {
     { headers: serviceHeaders() },
   );
   const admins = adminRes.ok ? await adminRes.json() : [];
-  if (!admins.length) return json({ error: "Only admins can add collectors." }, 403);
+  if (!admins.length) return json({ error: "Only admins can manage collectors." }, 403);
 
-  // 3. Validate the input.
   const input = await req.json().catch(() => ({}));
+  const action = String(input.action || "create");
   const collectorId = String(input.id || "").trim().toUpperCase();
-  const name = String(input.name || "").trim();
-  const email = String(input.email || "").trim().toLowerCase();
-  const password = String(input.password || "");
 
-  if (!/^COL-\d{3,6}$/.test(collectorId)) return json({ error: "Collector ID must look like COL-1234." }, 400);
-  if (name.length < 2 || name.length > 100) return json({ error: "Enter the collector's full name." }, 400);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
-  if (password.length < 8) return json({ error: "The temporary password must be at least 8 characters." }, 400);
-
-  // 4. Create the sign-in account. The email is confirmed so the collector can sign in straight away.
-  const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-    method: "POST",
-    headers: serviceHeaders(),
-    body: JSON.stringify({ email, password, email_confirm: true }),
-  });
-  if (!createRes.ok) {
-    const detail = await createRes.text();
-    const exists = /already|registered|exists/i.test(detail);
-    return json(
-      { error: exists ? "An account with this email already exists." : "Could not create the account." },
-      exists ? 409 : 400,
+  // Find an existing collector record (used by update and delete).
+  async function findCollector() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/collectors?select=id,name,email,user_id&id=eq.${encodeURIComponent(collectorId)}`,
+      { headers: serviceHeaders() },
     );
+    const rows = res.ok ? await res.json() : [];
+    return rows[0] || null;
   }
-  const user = await createRes.json();
 
-  // 5. Link the account to a new collector record.
-  const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/collectors`, {
-    method: "POST",
-    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
-    body: JSON.stringify({ id: collectorId, name, email, user_id: user.id, active: true }),
-  });
-  if (!insertRes.ok) {
-    // Roll back the account so no orphan login is left behind.
-    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
-      method: "DELETE",
+  // ---------- create ----------
+  if (action === "create") {
+    const name = String(input.name || "").trim();
+    const email = String(input.email || "").trim().toLowerCase();
+    const password = String(input.password || "");
+
+    if (!validId(collectorId)) return json({ error: "Collector ID must look like COL-1234." }, 400);
+    if (name.length < 2 || name.length > 100) return json({ error: "Enter the collector's full name." }, 400);
+    if (!validEmail(email)) return json({ error: "Enter a valid email address." }, 400);
+    if (password.length < 8) return json({ error: "The temporary password must be at least 8 characters." }, 400);
+
+    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: "POST",
       headers: serviceHeaders(),
+      body: JSON.stringify({ email, password, email_confirm: true }),
     });
-    const duplicate = insertRes.status === 409 || insertRes.status === 23505;
-    return json(
-      { error: duplicate ? "That collector ID is already in use." : "Could not save the collector record." },
-      duplicate ? 409 : 500,
-    );
+    if (!createRes.ok) {
+      const detail = await createRes.text();
+      const exists = /already|registered|exists/i.test(detail);
+      return json(
+        { error: exists ? "An account with this email already exists." : "Could not create the account." },
+        exists ? 409 : 400,
+      );
+    }
+    const user = await createRes.json();
+
+    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/collectors`, {
+      method: "POST",
+      headers: serviceHeaders({ Prefer: "return=minimal" }),
+      body: JSON.stringify({ id: collectorId, name, email, user_id: user.id, active: true }),
+    });
+    if (!insertRes.ok) {
+      await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
+        method: "DELETE",
+        headers: serviceHeaders(),
+      });
+      const duplicate = insertRes.status === 409;
+      return json(
+        { error: duplicate ? "That collector ID is already in use." : "Could not save the collector record." },
+        duplicate ? 409 : 500,
+      );
+    }
+    return json({ ok: true, id: collectorId, name, email });
   }
 
-  return json({ ok: true, id: collectorId, name, email });
+  // ---------- update ----------
+  if (action === "update") {
+    const existing = await findCollector();
+    if (!existing) return json({ error: "Collector not found." }, 404);
+
+    const name = input.name !== undefined ? String(input.name).trim() : existing.name;
+    const email = input.email !== undefined ? String(input.email).trim().toLowerCase() : existing.email;
+    const password = String(input.password || "");
+
+    if (name.length < 2 || name.length > 100) return json({ error: "Enter the collector's full name." }, 400);
+    if (!validEmail(email)) return json({ error: "Enter a valid email address." }, 400);
+    if (password && password.length < 8) return json({ error: "The new password must be at least 8 characters." }, 400);
+
+    if (existing.user_id) {
+      const authBody: Record<string, unknown> = { email, email_confirm: true };
+      if (password) authBody.password = password;
+      const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${existing.user_id}`, {
+        method: "PUT",
+        headers: serviceHeaders(),
+        body: JSON.stringify(authBody),
+      });
+      if (!authRes.ok) {
+        const detail = await authRes.text();
+        const taken = /already|registered|exists/i.test(detail);
+        return json(
+          { error: taken ? "Another account already uses this email." : "Could not update the sign-in details." },
+          taken ? 409 : 400,
+        );
+      }
+    }
+
+    const patchRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collectors?id=eq.${encodeURIComponent(existing.id)}`,
+      {
+        method: "PATCH",
+        headers: serviceHeaders({ Prefer: "return=minimal" }),
+        body: JSON.stringify({ name, email }),
+      },
+    );
+    if (!patchRes.ok) return json({ error: "Could not save the collector record." }, 500);
+    return json({ ok: true, id: existing.id, name, email });
+  }
+
+  // ---------- delete ----------
+  if (action === "delete") {
+    const existing = await findCollector();
+    if (!existing) return json({ error: "Collector not found." }, 404);
+
+    const txRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/transactions?select=id&collector_id=eq.${encodeURIComponent(existing.id)}&limit=1`,
+      { headers: serviceHeaders() },
+    );
+    const txRows = txRes.ok ? await txRes.json() : [];
+    if (txRows.length) {
+      return json(
+        { error: "This collector has recorded payments, so they can't be removed. Deactivate them instead to keep the records." },
+        409,
+      );
+    }
+
+    const delRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/collectors?id=eq.${encodeURIComponent(existing.id)}`,
+      { method: "DELETE", headers: serviceHeaders({ Prefer: "return=minimal" }) },
+    );
+    if (!delRes.ok) return json({ error: "Could not remove the collector." }, 500);
+
+    if (existing.user_id) {
+      await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${existing.user_id}`, {
+        method: "DELETE",
+        headers: serviceHeaders(),
+      });
+    }
+    return json({ ok: true, id: existing.id });
+  }
+
+  return json({ error: "Unknown action." }, 400);
 });

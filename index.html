@@ -606,6 +606,33 @@
   </div>
 </div>
 
+<!-- Edit collector -->
+<div id="editCollectorModal" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Edit collector</h3>
+    <div class="muted" style="margin-bottom:16px;" id="editCollectorId"></div>
+    <form id="editCollectorForm">
+      <div class="form-group" style="text-align:left;">
+        <label for="editName">Full name</label>
+        <input type="text" id="editName" required>
+      </div>
+      <div class="form-group" style="text-align:left;">
+        <label for="editEmail">Gmail address</label>
+        <input type="email" id="editEmail" required>
+      </div>
+      <div class="form-group" style="text-align:left;">
+        <label for="editPassword">New password (leave blank to keep the current one)</label>
+        <input type="text" id="editPassword" minlength="8" autocomplete="off">
+      </div>
+      <div id="editError" class="error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeEditCollectorModal()">Cancel</button>
+        <button type="submit" class="btn-block">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Change collector password -->
 <div id="collectorPasswordModal" class="modal-overlay">
   <div class="modal-card">
@@ -1289,7 +1316,11 @@ function renderCollectors() {
       <td>${c.active
         ? '<span class="badge badge-synced">Active</span>'
         : '<span class="badge badge-pending">Inactive</span>'}</td>
-      <td><button class="btn" onclick="setCollectorActive('${esc(c.id)}', ${!c.active})">${c.active ? 'Deactivate' : 'Activate'}</button></td>
+      <td style="white-space:nowrap;">
+        <button class="btn" onclick="editCollector('${esc(c.id)}')">Edit</button>
+        <button class="btn" onclick="setCollectorActive('${esc(c.id)}', ${!c.active})">${c.active ? 'Deactivate' : 'Activate'}</button>
+        <button class="btn" style="color:#fecaca;" onclick="removeCollector('${esc(c.id)}')">Remove</button>
+      </td>
     </tr>`).join('');
 }
 
@@ -1326,6 +1357,7 @@ $('addCollectorForm').addEventListener('submit', async e => {
         'Authorization': 'Bearer ' + state.adminToken
       },
       body: JSON.stringify({
+        action: 'create',
         id: $('newCollectorId').value,
         name: $('newCollectorName').value,
         email: $('newCollectorEmail').value,
@@ -1342,6 +1374,72 @@ $('addCollectorForm').addEventListener('submit', async e => {
     msg.textContent = 'Could not reach the server. Check your connection and try again.';
   }
 });
+
+/* ---------- Admin: edit and remove collectors ---------- */
+let editingCollectorId = null;
+
+async function manageCollector(payload) {
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/functions/v1/create-collector', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': CONFIG.apiKey,
+        'Authorization': 'Bearer ' + state.adminToken
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 401) {
+      adminSessionEnded();
+      return { ok: false, error: 'Your session has ended. Please sign in again.' };
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: data.error || 'Something went wrong. Please try again.' };
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: 'Could not reach the server. Check your connection and try again.' };
+  }
+}
+
+function editCollector(id) {
+  const c = state.collectorsList.find(x => x.id === id);
+  if (!c) return;
+  editingCollectorId = id;
+  $('editCollectorId').textContent = c.id;
+  $('editName').value = c.name;
+  $('editEmail').value = c.email || '';
+  $('editPassword').value = '';
+  $('editError').textContent = '';
+  $('editCollectorModal').classList.add('open');
+  setTimeout(() => $('editName').focus(), 60);
+}
+
+function closeEditCollectorModal() {
+  $('editCollectorModal').classList.remove('open');
+  editingCollectorId = null;
+}
+
+$('editCollectorForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('editError').textContent = 'Saving…';
+  const result = await manageCollector({
+    action: 'update',
+    id: editingCollectorId,
+    name: $('editName').value.trim(),
+    email: $('editEmail').value.trim(),
+    password: $('editPassword').value
+  });
+  if (!result.ok) { $('editError').textContent = result.error; return; }
+  closeEditCollectorModal();
+  loadCollectors();
+});
+
+async function removeCollector(id) {
+  if (!confirm('Remove collector ' + id + '? Their sign-in account will be deleted. This cannot be undone.')) return;
+  const result = await manageCollector({ action: 'delete', id });
+  if (!result.ok) { alert(result.error); return; }
+  loadCollectors();
+}
 
 /* ---------- Initial render ---------- */
 function renderAll() { renderAdmin(); }
