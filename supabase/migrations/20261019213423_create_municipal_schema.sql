@@ -48,14 +48,3 @@ create policy "taxpayers readable" on public.taxpayers
 -- Field devices may only insert transactions. They cannot read, edit or delete the ledger.
 create policy "transactions insert from devices" on public.transactions
   for insert to anon, authenticated with check (true);
-
--- Sample taxpayers and collectors for the demo. Replace with the council's data before live use.
-insert into public.taxpayers (id, business, stall, owner, zone, standard_rate) values
-  ('TP-0402', 'Mabinty''s General Store', '402', 'Mabinty Kamara', 'Kissy Market', 50000),
-  ('TP-0231', 'Fatmata Tailoring', '231', 'Fatmata Conteh', 'Kissy Market', 30000),
-  ('TP-0077', 'Kono Fresh Produce', '77', 'Ibrahim Kono', 'Kissy Market', 40000),
-  ('TP-0118', 'Alhaji Transport Hub', '-', 'Alhaji Sesay', 'Central Station', 120000);
-
-insert into public.collectors (id, name) values
-  ('COL-8492', 'Collector 8492'),
-  ('COL-8411', 'Collector 8411');
