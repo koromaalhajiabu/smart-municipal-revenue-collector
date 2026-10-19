@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="SmartMunicipal revenue collection for Freetown City Council">
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SmartMunicipal">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>SmartMunicipal · Revenue Collection</title>
+<style>
+  :root {
+    --bg: #070b14;
+    --bg-2: #0b1222;
+    --surface: rgba(255, 255, 255, 0.045);
+    --surface-strong: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.09);
+    --text: #e8eefb;
+    --muted: #8a97b0;
+    --accent: #34d399;
+    --accent-strong: #10b981;
+    --cyan: #22d3ee;
+    --indigo: #818cf8;
+    --amber: #fbbf24;
+    --danger: #f87171;
+    --radius-lg: 22px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(16, 185, 129, 0.18), transparent 60%),
+      radial-gradient(900px 600px at 110% 10%, rgba(99, 102, 241, 0.20), transparent 60%),
+      radial-gradient(800px 700px at 50% 120%, rgba(34, 211, 238, 0.12), transparent 60%),
+      linear-gradient(180deg, var(--bg-2), var(--bg));
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); font-size: 12px; }
+
+  /* ---------- Header ---------- */
+  .app-header {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    padding: 14px 22px;
+    background: rgba(7, 11, 20, 0.6);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, #0f172a, #047857);
+    box-shadow: 0 8px 24px -6px rgba(16, 185, 129, 0.55), inset 0 0 0 1px rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-title {
+    font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+    background: linear-gradient(90deg, #ffffff, #a7f3d0);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .brand-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+
+  .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .sync-pill {
+    font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 99px;
+    background: var(--surface-strong); color: #cbd5e1; border: 1px solid var(--border);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .sync-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 3px rgba(138,151,176,0.15); }
+  .sync-pill.online::before { background: var(--accent); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); }
+  .sync-pill.pending::before { background: var(--amber); box-shadow: 0 0 0 3px rgba(251,191,36,0.18); }
+  .sync-pill.offline::before { background: var(--danger); box-shadow: 0 0 0 3px rgba(248,113,113,0.18); }
+
+  .segmented {
+    display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  }
+  .segmented button {
+    background: transparent; border: none; color: var(--muted);
+    padding: 8px 14px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all .2s ease;
+  }
+  .segmented button:hover { color: var(--text); }
+  .segmented button.active {
+    background: linear-gradient(135deg, var(--accent-strong), #059669);
+    color: #fff; box-shadow: 0 6px 18px -6px rgba(16,185,129,0.7);
+  }
+
+  .btn {
+    border: 1px solid var(--border); background: var(--surface-strong); color: var(--text);
+    padding: 9px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: transform .15s ease, background .2s ease;
+  }
+  .btn:hover { background: rgba(255,255,255,0.12); }
+  .btn:active { transform: scale(.98); }
+  .btn-install {
+    background: linear-gradient(135deg, rgba(34,211,238,0.22), rgba(129,140,248,0.22));
+    border-color: rgba(34,211,238,0.35);
+  }
+
+  /* ---------- Layout ---------- */
+  main { flex: 1; width: 100%; }
+  .view-section { display: none; width: 100%; max-width: 1140px; margin: 28px auto; padding: 0 18px; animation: rise .45s ease both; }
+  .view-section.active { display: block; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), transparent 35%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px;
+  }
+  .card h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .card-sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .agent-chip {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 6px 12px; border-radius: 99px;
+    background: rgba(52,211,153,0.12); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.3);
+  }
+
+  #collectorView .narrow { max-width: 460px; margin: 0 auto; }
+
+  /* ---------- Forms ---------- */
+  .form-group { margin-bottom: 16px; }
+  label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+  input, select {
+    width: 100%; padding: 12px 14px; font-size: 14px; color: var(--text);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    outline: none; transition: border-color .2s, box-shadow .2s, background .2s;
+    font-family: inherit;
+  }
+  input::placeholder { color: #55627a; }
+  select option { background: #0b1222; color: var(--text); }
+  input:focus, select:focus { border-color: rgba(52,211,153,0.6); box-shadow: 0 0 0 4px rgba(52,211,153,0.14); background: rgba(255,255,255,0.07); }
+  .search-row { display: flex; gap: 10px; }
+  .search-row input { flex: 1; }
+  .btn-solid {
+    background: linear-gradient(135deg, #1e293b, #334155); border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; padding: 0 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-solid:hover { filter: brightness(1.15); }
+  .btn-primary {
+    width: 100%; padding: 14px; border: none; border-radius: 14px; cursor: pointer;
+    font-size: 15px; font-weight: 700; color: #04130d; letter-spacing: 0.01em;
+    background: linear-gradient(135deg, #6ee7b7, #34d399 45%, #22d3ee);
+    box-shadow: 0 14px 34px -10px rgba(52,211,153,0.65);
+    transition: transform .15s ease, filter .2s ease, box-shadow .2s ease;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary:active { transform: scale(.985); }
+  .btn-primary:disabled { background: #334155; color: #94a3b8; box-shadow: none; cursor: not-allowed; }
+  .error { color: #fca5a5; font-size: 12px; min-height: 18px; margin-bottom: 10px; }
+
+  .amount-wrap { position: relative; }
+  .amount-wrap .prefix {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 13px; font-weight: 600; pointer-events: none;
+  }
+  .amount-wrap input { padding-left: 52px; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+
+  /* Search results + taxpayer card */
+  .results { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: rgba(0,0,0,0.25); }
+  .result-item {
+    display: block; width: 100%; text-align: left; padding: 12px 14px; cursor: pointer;
+    background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; font-family: inherit;
+  }
+  .result-item:last-child { border-bottom: none; }
+  .result-item:hover { background: rgba(52,211,153,0.08); }
+  .result-item small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  .taxpayer-info {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(34,211,238,0.08));
+    border: 1px solid rgba(52,211,153,0.3); border-radius: var(--radius-md);
+    padding: 16px; margin-bottom: 16px;
+  }
+  .taxpayer-info .biz { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .taxpayer-info .meta { color: #a7f3d0; font-size: 12px; margin-top: 3px; }
+  .taxpayer-info .rate { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 700; color: #04130d; background: #6ee7b7; padding: 4px 10px; border-radius: 99px; }
+
+  .reference-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- KPIs ---------- */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 22px; }
+  .kpi-card {
+    position: relative; overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+    border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px;
+  }
+  .kpi-card::after {
+    content: ""; position: absolute; width: 140px; height: 140px; right: -50px; top: -50px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(52,211,153,0.35), transparent 70%); pointer-events: none;
+  }
+  .kpi-card:nth-child(2)::after { background: radial-gradient(circle, rgba(129,140,248,0.35), transparent 70%); }
+  .kpi-card:nth-child(3)::after { background: radial-gradient(circle, rgba(251,191,36,0.3), transparent 70%); }
+  .kpi-card:nth-child(4)::after { background: radial-gradient(circle, rgba(34,211,238,0.35), transparent 70%); }
+  .kpi-card h3 { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .kpi-card .value {
+    font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #ffffff, #bbf7d0);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- Table ---------- */
+  .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+  .toolbar > div { min-width: 170px; flex: 1; }
+  .toolbar .form-group { margin-bottom: 0; }
+  .table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--border); background: rgba(0,0,0,0.18); }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+  th {
+    background: rgba(255,255,255,0.04); color: var(--muted);
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 13px 14px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  td { padding: 13px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; white-space: nowrap; }
+  tbody tr { transition: background .15s ease; }
+  tbody tr:hover td { background: rgba(255,255,255,0.03); }
+  tbody tr:last-child td { border-bottom: none; }
+  td strong { color: #fff; font-weight: 600; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge-synced { background: rgba(52,211,153,0.12); color: #6ee7b7; }
+  .badge-pending { background: rgba(251,191,36,0.12); color: #fcd34d; }
+  .empty { text-align: center; color: var(--muted); padding: 36px; }
+
+  /* ---------- Modals ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 18px;
+    background: rgba(2, 6, 14, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .modal-overlay.open { display: flex; animation: fade .25s ease both; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .modal-card {
+    width: 100%; max-width: 360px; padding: 26px; text-align: center; border-radius: 24px;
+    background: linear-gradient(180deg, #111a2e, #0a1120); border: 1px solid var(--border); box-shadow: var(--shadow);
+    animation: pop .35s cubic-bezier(.2,.9,.3,1.2) both;
+  }
+  @keyframes pop { from { opacity: 0; transform: scale(.94) translateY(8px); } to { opacity: 1; transform: none; } }
+  .modal-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .modal-icon {
+    width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #04130d;
+    background: linear-gradient(135deg, #6ee7b7, #22d3ee); box-shadow: 0 0 0 8px rgba(52,211,153,0.12), 0 12px 30px -8px rgba(52,211,153,0.6);
+  }
+  .receipt-box {
+    text-align: left; font-size: 12px; margin: 14px 0 18px; padding: 14px; border-radius: var(--radius-md);
+    background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.16);
+  }
+  .receipt-box p { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--muted); }
+  .receipt-box p span { color: var(--text); font-weight: 600; text-align: right; word-break: break-all; }
+  .receipt-box .sync-note { display: block; color: #fcd34d; margin-top: 10px; font-weight: 500; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions > * { flex: 1; }
+  .btn-block { width: 100%; padding: 13px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; color: #04130d; background: linear-gradient(135deg, #6ee7b7, #34d399 50%, #22d3ee); }
+
+  /* ---------- Footer ---------- */
+  footer.app-footer {
+    margin-top: 40px; padding: 26px 20px 30px; text-align: center;
+    border-top: 1px solid var(--border); color: var(--muted); font-size: 12px;
+  }
+  footer.app-footer .credit {
+    display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px; border-radius: 99px;
+    background: linear-gradient(135deg, rgba(52,211,153,0.10), rgba(129,140,248,0.10));
+    border: 1px solid var(--border); color: #dbe4f5;
+  }
+  footer.app-footer .credit b {
+    font-weight: 700;
+    background: linear-gradient(90deg, #6ee7b7, #22d3ee 60%, #a5b4fc);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  footer.app-footer .legal { margin-top: 12px; font-size: 11px; color: #56627a; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 640px) {
+    .app-header { padding: 12px 14px; }
+    .brand-sub { display: none; }
+    .view-section { margin: 18px auto; padding: 0 12px; }
+    .card { padding: 20px; }
+    .kpi-card .value { font-size: 22px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="8.2" stroke="#ecfdf5" stroke-width="2.2"/>
+        <circle cx="12" cy="12" r="2.6" fill="#34d399"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-title">SmartMunicipal</div>
+      <div class="brand-sub">Freetown City Council · Revenue</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span id="syncPill" class="sync-pill">Checking connection…</span>
+    <button id="installBtn" class="btn btn-install hidden" onclick="installApp()">Install app</button>
+    <div class="segmented" role="tablist">
+      <button class="active" onclick="switchView('collector', this)">Collector</button>
+      <button onclick="switchView('admin', this)">Admin</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= COLLECTOR VIEW ================= -->
+  <section id="collectorView" class="view-section active">
+
+    <div id="loginCard" class="card narrow hidden">
+      <div class="card-head" style="margin-bottom:6px;">
+        <div>
+          <h2>Collector sign-in</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Enter your agent ID and PIN to start collecting.</div>
+        </div>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginAgent">Agent ID</label>
+          <input type="text" id="loginAgent" autocomplete="username" required placeholder="e.g. COL-8492">
+        </div>
+        <div class="form-group">
+          <label for="loginPin">PIN</label>
+          <input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password" required>
+        </div>
+        <div id="loginError" class="error"></div>
+        <button type="submit" class="btn-primary">Sign in</button>
+      </form>
+    </div>
+
+    <div id="collectorCard" class="card narrow hidden">
+      <div class="card-head">
+        <div>
+          <h2>Record field levy</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Search a taxpayer, then record the payment.</div>
+        </div>
+        <div class="card-actions">
+          <span id="agentBadge" class="agent-chip"></span>
+          <button class="btn" onclick="signOut()">Sign out</button>
+        </div>
+      </div>
+
+      <form id="collectionForm">
+        <div class="form-group">
+          <label for="searchQuery">Taxpayer, stall or shop</label>
+          <div class="search-row">
+            <input type="text" id="searchQuery" placeholder="e.g. Mabinty, Stall 402 or TP-0402">
+            <button type="button" class="btn-solid" onclick="searchTaxpayer()">Find</button>
+          </div>
+          <div id="searchResults" class="results hidden"></div>
+          <div id="searchMsg" class="muted" style="margin-top:8px;"></div>
+        </div>
+
+        <div id="taxpayerInfo" class="taxpayer-info hidden">
+          <div class="biz" id="infoBusiness"></div>
+          <div class="meta" id="infoOwner"></div>
+          <div class="meta" id="infoStall"></div>
+          <div class="meta" id="infoZone"></div>
+          <span class="rate" id="infoRate"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="levyType">Levy type</label>
+          <select id="levyType">
+            <option value="Market levy">Market levy</option>
+            <option value="Stall rent">Stall rent</option>
+            <option value="Business licence">Business licence</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="amount">Amount</label>
+          <div class="amount-wrap">
+            <span class="prefix">Le</span>
+            <input type="number" id="amount" min="1" step="1" required placeholder="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="paymentMethod">Payment method</label>
+          <select id="paymentMethod" onchange="toggleReference()">
+            <option value="Cash">Cash</option>
+            <option value="Orange Money">Orange Money</option>
+            <option value="Africell Money">Africell Money</option>
+          </select>
+        </div>
+
+        <div id="referenceGroup" class="form-group hidden">
+          <label for="momoRef">Mobile money reference</label>
+          <input type="text" id="momoRef" placeholder="From the customer's SMS receipt">
+          <div class="reference-hint">Letters and digits, at least 6 characters.</div>
+        </div>
+
+        <div id="formError" class="error"></div>
+        <button type="submit" id="submitBtn" class="btn-primary">Confirm &amp; generate receipt</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ================= ADMIN VIEW ================= -->
+  <section id="adminView" class="view-section">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <h3>Collected today</h3>
+        <div class="value" id="kpiToday">Le 0</div>
+        <div class="sub" id="kpiTodayCount">0 transactions</div>
+      </div>
+      <div class="kpi-card">
+        <h3>All-time collections</h3>
+        <div class="value" id="kpiAll">Le 0</div>
+        <div class="sub" id="kpiAllCount">0 transactions</div>
+      </div>
+      <div class="kpi-card">
+        <h3>Awaiting sync</h3>
+        <div class="value" id="kpiPending">0</div>
+        <div class="sub">Saved on this device, not yet on the server</div>
+      </div>
+      <div class="kpi-card">
+        <h3>Mobile money share</h3>
+        <div class="value" id="kpiMomo">0%</div>
+        <div class="sub" id="kpiMethods">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Municipal transaction ledger</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Live records from the council server.</div>
+        </div>
+        <div class="card-actions">
+          <button class="btn" onclick="syncPending(true)">Sync now</button>
+          <button class="btn" onclick="openPasswordModal()">Change password</button>
+          <button class="btn" onclick="exportCSV()">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="form-group">
+          <label for="filterStatus">Sync status</label>
+          <select id="filterStatus" onchange="renderAdmin()">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="synced">Synced</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filterMethod">Payment method</label>
+          <select id="filterMethod" onchange="renderAdmin()">
+            <option value="">All</option>
+            <option value="Cash">Cash</option>
+            <option value="Orange Money">Orange Money</option>
+            <option value="Africell Money">Africell Money</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filterCollector">Collector</label>
+          <select id="filterCollector" onchange="renderAdmin()">
+            <option value="">All</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Receipt</th>
+              <th>Taxpayer / business</th>
+              <th>Levy</th>
+              <th>Zone</th>
+              <th>Collector</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Reference</th>
+              <th>Date / time</th>
+              <th>Sync</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <div class="credit">Designed by <b>Alhaji Abu Koroma</b></div>
+  <div class="legal">SmartMunicipal · Freetown City Council revenue platform</div>
+</footer>
+
+<!-- Receipt modal -->
+<div id="receiptModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-icon">✓</div>
+    <h3>Collection recorded</h3>
+    <div class="receipt-box">
+      <p>Receipt <span id="resReceipt"></span></p>
+      <p>Business <span id="resBusiness"></span></p>
+      <p>Levy <span id="resLevy"></span></p>
+      <p>Amount <span id="resAmount"></span></p>
+      <p>Method <span id="resMethod"></span></p>
+      <p>Time <span id="resTime"></span></p>
+      <span class="sync-note" id="resSync"></span>
+    </div>
+    <button type="button" class="btn-block" onclick="closeReceipt()">Done · next collection</button>
+  </div>
+</div>
+
+<!-- Admin sign-in -->
+<div id="adminGate" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Admin access</h3>
+    <div class="muted" style="margin-bottom:16px;">Sign in with your admin account.</div>
+    <form id="adminGateForm">
+      <div class="form-group" style="text-align:left;">
+        <label for="adminEmail">Email</label>
+        <input type="email" id="adminEmail" autocomplete="username" required>
+      </div>
+      <div class="form-group" style="text-align:left;">
+        <label for="adminPassword">Password</label>
+        <input type="password" id="adminPassword" autocomplete="current-password" required>
+      </div>
+      <div id="adminGateError" class="error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="cancelAdminGate()">Cancel</button>
+        <button type="submit" class="btn-block">Enter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Change admin password -->
+<div id="passwordModal" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Change password</h3>
+    <div class="muted" style="margin-bottom:16px;">Use at least 8 characters.</div>
+    <form id="passwordForm">
+      <div class="form-group" style="text-align:left;">
+        <label for="newPassword">New password</label>
+        <input type="password" id="newPassword" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="form-group" style="text-align:left;">
+        <label for="confirmPassword">Confirm password</label>
+        <input type="password" id="confirmPassword" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div id="passwordError" class="error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closePasswordModal()">Cancel</button>
+        <button type="submit" class="btn-block">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ==========================================================
+   CONFIGURATION
+   Public values only. Never put a secret or service-role key here.
+   ========================================================== */
+const CONFIG = {
+  zone: 'Kissy Market',
+  supabaseUrl: 'https://zguyhvdbaxmfshvwwywf.supabase.co',
+  syncEndpoint: 'https://zguyhvdbaxmfshvwwywf.supabase.co/rest/v1/transactions?on_conflict=id',
+  apiKey: 'sb_publishable_6z7hcOayCqJRd6R8fa7suQ_AA9IPmpn',
+  // Demo collector PINs. Replace with Supabase Auth sign-in before live use.
+  collectors: [
+    { id: 'COL-8492', name: 'Collector 8492', pin: '1234' },
+    { id: 'COL-8411', name: 'Collector 8411', pin: '5678' }
+  ]
+};
+
+/* Sample register, used only if the server register cannot be loaded. */
+let TAXPAYERS = [
+  { id: 'TP-0402', business: "Mabinty's General Store", stall: '402', owner: 'Mabinty Kamara', zone: 'Kissy Market', rate: 50000 },
+  { id: 'TP-0231', business: 'Fatmata Tailoring', stall: '231', owner: 'Fatmata Conteh', zone: 'Kissy Market', rate: 30000 },
+  { id: 'TP-0077', business: 'Kono Fresh Produce', stall: '77', owner: 'Ibrahim Kono', zone: 'Kissy Market', rate: 40000 },
+  { id: 'TP-0118', business: 'Alhaji Transport Hub', stall: '-', owner: 'Alhaji Sesay', zone: 'Central Station', rate: 120000 }
+];
+
+/* ---------- State and storage ---------- */
+const KEYS = { ledger: 'smc_ledger', session: 'smc_session', admin: 'smc_admin' };
+const state = { collector: null, selected: null, ledger: [], serverRows: null, adminToken: null, adminOk: false, syncing: false };
+
+const $ = id => document.getElementById(id);
+
+function readStore(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch (e) { return fallback; }
+}
+function writeStore(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch (e) { showFormError('Device storage is full. Sync or clear old records.'); return false; }
+}
+function persistLedger() { writeStore(KEYS.ledger, state.ledger); }
+
+function uid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmt(n) { return 'Le ' + Math.round(Number(n) || 0).toLocaleString('en-US'); }
+function fmtDateTime(iso) { return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+function isToday(iso) { return new Date(iso).toDateString() === new Date().toDateString(); }
+
+/* ---------- View switching ---------- */
+function switchView(view, btn) {
+  if (view === 'admin' && !state.adminOk) {
+    openAdminGate(btn);
+    return;
+  }
+  activateView(view, btn);
+}
+
+function activateView(view, btn) {
+  document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.segmented button').forEach(el => el.classList.remove('active'));
+  $(view === 'admin' ? 'adminView' : 'collectorView').classList.add('active');
+  const tabs = document.querySelectorAll('.segmented button');
+  const target = btn || tabs[view === 'admin' ? 1 : 0];
+  if (target) target.classList.add('active');
+  if (view === 'admin') { renderAdmin(); loadServerLedger(); }
+}
+
+function openAdminGate() {
+  $('adminPassword').value = '';
+  $('adminGateError').textContent = '';
+  $('adminGate').classList.add('open');
+  setTimeout(() => $('adminEmail').focus(), 60);
+}
+function cancelAdminGate() {
+  $('adminGate').classList.remove('open');
+  activateView('collector');
+}
+
+$('adminGateForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('adminGateError').textContent = 'Signing in…';
+  try {
+    state.adminToken = await signInAdmin($('adminEmail').value.trim(), $('adminPassword').value);
+    state.adminOk = true;
+    sessionStorage.setItem(KEYS.admin, state.adminToken);
+    $('adminGate').classList.remove('open');
+    activateView('admin');
+  } catch (err) {
+    $('adminGateError').textContent = 'Could not sign in. Check your email and password, and that you are online.';
+  }
+});
+
+/* ---------- Collector sign-in ---------- */
+function showCollectorState() {
+  const signedIn = !!state.collector;
+  $('loginCard').classList.toggle('hidden', signedIn);
+  $('collectorCard').classList.toggle('hidden', !signedIn);
+  if (signedIn) $('agentBadge').textContent = state.collector.id;
+}
+
+$('loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const id = $('loginAgent').value.trim().toUpperCase();
+  const pin = $('loginPin').value;
+  const c = CONFIG.collectors.find(x => x.id === id);
+  if (!c || c.pin !== pin) {
+    $('loginError').textContent = 'Incorrect agent ID or PIN.';
+    return;
+  }
+  state.collector = c;
+  sessionStorage.setItem(KEYS.session, c.id);
+  $('loginForm').reset();
+  $('loginError').textContent = '';
+  showCollectorState();
+  renderAll();
+});
+
+function signOut() {
+  state.collector = null;
+  sessionStorage.removeItem(KEYS.session);
+  resetForm();
+  showCollectorState();
+}
+
+/* ---------- Taxpayer search ---------- */
+function searchTaxpayer() {
+  const q = $('searchQuery').value.trim().toLowerCase();
+  const results = $('searchResults');
+  results.innerHTML = '';
+  results.classList.add('hidden');
+  if (q.length < 2) {
+    $('searchMsg').textContent = 'Type at least 2 characters to search.';
+    return;
+  }
+  const hits = TAXPAYERS.filter(t => [t.id, t.business, t.owner, t.stall].join(' ').toLowerCase().includes(q));
+  if (!hits.length) {
+    $('searchMsg').textContent = 'No taxpayer found. Check the spelling or ask for the stall number.';
+    return;
+  }
+  $('searchMsg').textContent = hits.length + ' result(s). Tap a taxpayer to select.';
+  hits.forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'result-item';
+    b.innerHTML = `${esc(t.business)} <small>${esc(t.id)} · Stall ${esc(t.stall)} · ${esc(t.zone)}</small>`;
+    b.onclick = () => selectTaxpayer(t.id);
+    results.appendChild(b);
+  });
+  results.classList.remove('hidden');
+}
+
+function selectTaxpayer(id) {
+  state.selected = TAXPAYERS.find(t => t.id === id) || null;
+  if (!state.selected) return;
+  $('infoBusiness').textContent = state.selected.business;
+  $('infoOwner').textContent = 'Owner · ' + state.selected.owner;
+  $('infoStall').textContent = 'Stall ' + state.selected.stall + ' · ' + state.selected.id;
+  $('infoZone').textContent = 'Zone · ' + state.selected.zone;
+  $('infoRate').textContent = 'Standard rate ' + fmt(state.selected.rate);
+  $('taxpayerInfo').classList.remove('hidden');
+  $('searchResults').classList.add('hidden');
+  $('searchMsg').textContent = '';
+  showFormError('');
+}
+
+function toggleReference() {
+  const isCash = $('paymentMethod').value === 'Cash';
+  $('referenceGroup').classList.toggle('hidden', isCash);
+  if (isCash) $('momoRef').value = '';
+}
+
+function showFormError(msg) { $('formError').textContent = msg; }
+
+function resetForm() {
+  $('collectionForm').reset();
+  state.selected = null;
+  $('taxpayerInfo').classList.add('hidden');
+  $('searchResults').classList.add('hidden');
+  $('searchResults').innerHTML = '';
+  $('searchMsg').textContent = '';
+  $('referenceGroup').classList.add('hidden');
+  $('submitBtn').disabled = false;
+  showFormError('');
+}
+
+/* ---------- Recording a collection ---------- */
+$('collectionForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!state.collector) return;
+  if (!state.selected) return showFormError('Search and select a taxpayer first.');
+
+  const amount = Math.round(Number($('amount').value));
+  if (!(amount > 0)) return showFormError('Enter an amount greater than zero.');
+  if (amount > 100000000) return showFormError('Amount looks too large. Please check it.');
+
+  const method = $('paymentMethod').value;
+  const ref = $('momoRef').value.trim().toUpperCase();
+  if (method !== 'Cash' && !/^[A-Z0-9-]{6,}$/.test(ref)) {
+    return showFormError('Enter the mobile money reference (at least 6 letters or digits).');
+  }
+  if (method !== 'Cash' && state.ledger.some(t => t.collectorId === state.collector.id && t.reference === ref)) {
+    return showFormError('This mobile money reference has already been recorded.');
+  }
+
+  $('submitBtn').disabled = true; // prevents double submission
+  const seqKey = 'smc_seq_' + state.collector.id;
+  const seq = Number(readStore(seqKey, 0)) + 1;
+  if (!writeStore(seqKey, seq)) { $('submitBtn').disabled = false; return; }
+
+  const tx = {
+    id: uid(),
+    receipt: 'SLMC-' + new Date().getFullYear() + '-' + state.collector.id.replace(/\D/g, '') + '-' + String(seq).padStart(5, '0'),
+    taxpayerId: state.selected.id,
+    business: state.selected.business,
+    stall: state.selected.stall,
+    zone: state.selected.zone,
+    collectorId: state.collector.id,
+    levy: $('levyType').value,
+    amount,
+    method,
+    reference: method === 'Cash' ? '' : ref,
+    createdAt: new Date().toISOString(),
+    syncStatus: 'pending'
+  };
+
+  state.ledger.unshift(tx);
+  persistLedger();
+  showReceipt(tx);
+  renderAll();
+  syncPending(false);
+});
+
+function showReceipt(tx) {
+  $('resReceipt').textContent = tx.receipt;
+  $('resBusiness').textContent = tx.business;
+  $('resLevy').textContent = tx.levy;
+  $('resAmount').textContent = fmt(tx.amount);
+  $('resMethod').textContent = tx.method + (tx.reference ? ' · ' + tx.reference : '');
+  $('resTime').textContent = fmtDateTime(tx.createdAt);
+  $('resSync').textContent = tx.syncStatus === 'synced'
+    ? 'Saved to the council server.'
+    : 'Saved on this device. It uploads automatically when you are online.';
+  $('receiptModal').classList.add('open');
+}
+
+function closeReceipt() {
+  $('receiptModal').classList.remove('open');
+  resetForm();
+}
+
+/* ---------- Connection status and sync ---------- */
+function updateConnectionPill() {
+  const pill = $('syncPill');
+  const pending = state.ledger.filter(t => t.syncStatus === 'pending').length;
+  if (!navigator.onLine) {
+    pill.className = 'sync-pill offline';
+    pill.textContent = 'Offline · ' + pending + ' waiting';
+  } else if (pending) {
+    pill.className = 'sync-pill pending';
+    pill.textContent = 'Syncing · ' + pending + ' waiting';
+  } else {
+    pill.className = 'sync-pill online';
+    pill.textContent = 'Online · all synced';
+  }
+}
+
+async function syncPending(manual) {
+  if (state.syncing) return;
+  const pending = state.ledger.filter(t => t.syncStatus === 'pending');
+  if (!pending.length || !navigator.onLine) { updateConnectionPill(); return; }
+
+  state.syncing = true;
+  for (const tx of pending.slice().reverse()) { // upload oldest first
+    try {
+      const res = await fetch(CONFIG.syncEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': CONFIG.apiKey,
+          'Authorization': 'Bearer ' + CONFIG.apiKey,
+          'Prefer': 'resolution=ignore-duplicates'
+        },
+        body: JSON.stringify({
+          id: tx.id, receipt_number: tx.receipt, taxpayer_id: tx.taxpayerId,
+          business: tx.business, zone: tx.zone, collector_id: tx.collectorId,
+          levy: tx.levy, amount: tx.amount, payment_method: tx.method,
+          reference: tx.reference, created_at: tx.createdAt
+        })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      tx.syncStatus = 'synced';
+      tx.syncedAt = new Date().toISOString();
+    } catch (err) {
+      break; // stop here and retry on the next opportunity
+    }
+  }
+  persistLedger();
+  state.syncing = false;
+  renderAll();
+  if (manual && navigator.onLine && state.ledger.some(t => t.syncStatus === 'pending')) {
+    alert('Some records could not be uploaded. They will retry automatically.');
+  }
+}
+
+window.addEventListener('online', () => syncPending(false));
+window.addEventListener('offline', updateConnectionPill);
+
+/* ---------- Server connection (Supabase) ---------- */
+function sourceRows() { return state.serverRows || state.ledger; }
+
+function mapServerRow(r) {
+  return {
+    id: r.id, receipt: r.receipt_number, taxpayerId: r.taxpayer_id, business: r.business,
+    zone: r.zone, collectorId: r.collector_id, levy: r.levy, amount: Number(r.amount),
+    method: r.payment_method, reference: r.reference, createdAt: r.created_at, syncStatus: 'synced'
+  };
+}
+
+async function signInAdmin(email, password) {
+  const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) throw new Error('Sign-in failed: HTTP ' + res.status);
+  const data = await res.json();
+  if (!data.access_token) throw new Error('No access token returned');
+  return data.access_token;
+}
+
+function adminSessionEnded() {
+  state.adminToken = null; state.adminOk = false; state.serverRows = null;
+  sessionStorage.removeItem(KEYS.admin);
+  alert('Your admin session has ended. Please sign in again.');
+  activateView('collector');
+}
+
+async function loadServerLedger() {
+  if (!state.adminToken || !navigator.onLine) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/transactions?select=*&order=created_at.desc&limit=500', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken }
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    state.serverRows = (await res.json()).map(mapServerRow);
+    renderAdmin();
+  } catch (err) {
+    // keep showing device data if the server cannot be reached
+  }
+}
+
+async function loadTaxpayers() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/taxpayers?select=*&order=id.asc', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + CONFIG.apiKey }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if (rows.length) {
+      TAXPAYERS = rows.map(r => ({
+        id: r.id, business: r.business, stall: r.stall, owner: r.owner,
+        zone: r.zone, rate: Number(r.standard_rate)
+      }));
+    }
+  } catch (err) {
+    // keep the built-in sample register if the server cannot be reached
+  }
+}
+
+/* ---------- Admin dashboard ---------- */
+function filteredLedger() {
+  const status = $('filterStatus').value;
+  const method = $('filterMethod').value;
+  const collector = $('filterCollector').value;
+  return sourceRows().filter(t =>
+    (!status || t.syncStatus === status) &&
+    (!method || t.method === method) &&
+    (!collector || t.collectorId === collector)
+  );
+}
+
+function renderAdmin() {
+  const all = sourceRows();
+  const today = all.filter(t => isToday(t.createdAt));
+  const sum = list => list.reduce((s, t) => s + t.amount, 0);
+
+  $('kpiToday').textContent = fmt(sum(today));
+  $('kpiTodayCount').textContent = today.length + ' transaction(s)';
+  $('kpiAll').textContent = fmt(sum(all));
+  $('kpiAllCount').textContent = all.length + ' transaction(s)';
+  $('kpiPending').textContent = state.ledger.filter(t => t.syncStatus === 'pending').length;
+
+  const momo = all.filter(t => t.method !== 'Cash');
+  $('kpiMomo').textContent = (all.length ? Math.round((momo.length / all.length) * 100) : 0) + '%';
+  $('kpiMethods').textContent = all.length
+    ? ['Cash', 'Orange Money', 'Africell Money'].map(m => m + ': ' + all.filter(t => t.method === m).length).join(' · ')
+    : 'No transactions yet';
+
+  const sel = $('filterCollector');
+  const current = sel.value;
+  const ids = [...new Set(all.map(t => t.collectorId))];
+  sel.innerHTML = '<option value="">All</option>' + ids.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+  sel.value = ids.includes(current) ? current : '';
+
+  const rows = filteredLedger();
+  $('ledgerBody').innerHTML = rows.length
+    ? rows.map(t => `
+      <tr>
+        <td><strong>${esc(t.receipt)}</strong></td>
+        <td>${esc(t.business)}</td>
+        <td>${esc(t.levy)}</td>
+        <td>${esc(t.zone)}</td>
+        <td>${esc(t.collectorId)}</td>
+        <td>${fmt(t.amount)}</td>
+        <td>${esc(t.method)}</td>
+        <td>${esc(t.reference || '—')}</td>
+        <td>${esc(fmtDateTime(t.createdAt))}</td>
+        <td>${t.syncStatus === 'synced'
+          ? '<span class="badge badge-synced">Synced</span>'
+          : '<span class="badge badge-pending">Pending</span>'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="10" class="empty">No transactions match these filters.</td></tr>';
+
+  updateConnectionPill();
+}
+
+function exportCSV() {
+  const rows = filteredLedger();
+  if (!rows.length) return alert('Nothing to export for these filters.');
+  const header = ['Receipt', 'Taxpayer ID', 'Business', 'Stall', 'Levy', 'Zone', 'Collector', 'Amount (Le)', 'Method', 'Reference', 'Created', 'Sync status'];
+  const lines = [header].concat(rows.map(t => [
+    t.receipt, t.taxpayerId, t.business, t.stall, t.levy, t.zone, t.collectorId,
+    t.amount, t.method, t.reference, t.createdAt, t.syncStatus
+  ]));
+  const csv = lines.map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'municipal-ledger-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Admin password change ---------- */
+function openPasswordModal() {
+  if (!state.adminToken) return alert('Please sign in as an admin first.');
+  $('newPassword').value = '';
+  $('confirmPassword').value = '';
+  $('passwordError').textContent = '';
+  $('passwordModal').classList.add('open');
+  setTimeout(() => $('newPassword').focus(), 60);
+}
+function closePasswordModal() { $('passwordModal').classList.remove('open'); }
+
+$('passwordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pw = $('newPassword').value;
+  if (pw !== $('confirmPassword').value) { $('passwordError').textContent = 'The two passwords do not match.'; return; }
+  if (pw.length < 8) { $('passwordError').textContent = 'Use at least 8 characters.'; return; }
+  $('passwordError').textContent = 'Saving…';
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken },
+      body: JSON.stringify({ password: pw })
+    });
+    if (res.status === 401) { closePasswordModal(); return adminSessionEnded(); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    closePasswordModal();
+    alert('Your password has been changed.');
+  } catch (err) {
+    $('passwordError').textContent = 'Could not change the password. Check your connection and try again.';
+  }
+});
+
+/* ---------- Install as an app ---------- */
+let deferredInstallPrompt = null;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!isStandalone) $('installBtn').classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  $('installBtn').classList.add('hidden');
+});
+
+function installApp() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.finally(() => {
+      deferredInstallPrompt = null;
+      $('installBtn').classList.add('hidden');
+    });
+  } else if (isIOS) {
+    alert('To install on iPhone: tap the Share button in Safari, then choose "Add to Home Screen".');
+  }
+}
+
+if (isIOS && !isStandalone) $('installBtn').classList.remove('hidden');
+
+/* ---------- Service worker (offline app shell) ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* app still works online */ });
+  });
+}
+
+/* ---------- Initial render ---------- */
+function renderAll() { renderAdmin(); }
+
+window.addEventListener('DOMContentLoaded', () => {
+  state.ledger = readStore(KEYS.ledger, []);
+  state.adminToken = sessionStorage.getItem(KEYS.admin);
+  state.adminOk = !!state.adminToken;
+  const sid = sessionStorage.getItem(KEYS.session);
+  state.collector = CONFIG.collectors.find(c => c.id === sid) || null;
+
+  showCollectorState();
+  renderAll();
+  loadTaxpayers();
+  syncPending(false);
+});
+</script>
+</body>
+</html>
