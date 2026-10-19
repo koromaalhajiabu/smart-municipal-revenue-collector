@@ -110,6 +110,7 @@
   }
   .btn:hover { background: rgba(255,255,255,0.12); }
   .btn:active { transform: scale(.98); }
+  .btn-danger { color: #fecaca; border-color: rgba(248,113,113,0.35); }
   .btn-install {
     background: linear-gradient(135deg, rgba(34,211,238,0.22), rgba(129,140,248,0.22));
     border-color: rgba(34,211,238,0.35);
@@ -127,20 +128,15 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 24px;
+    margin-bottom: 22px;
     box-shadow: var(--shadow);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
-  .card::before {
-    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-    background: linear-gradient(135deg, rgba(255,255,255,0.10), transparent 35%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px;
-  }
   .card h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
-  .card-sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+  .card-sub { color: var(--muted); font-size: 12px; margin: 4px 0 18px; }
   .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
   .agent-chip {
     font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
@@ -181,6 +177,10 @@
   .btn-primary:active { transform: scale(.985); }
   .btn-primary:disabled { background: #334155; color: #94a3b8; box-shadow: none; cursor: not-allowed; }
   .error { color: #fca5a5; font-size: 12px; min-height: 18px; margin-bottom: 10px; }
+  .success { color: #6ee7b7; font-size: 12px; min-height: 18px; margin-bottom: 10px; }
+
+  .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: end; }
+  .grid-form .form-group { margin-bottom: 0; }
 
   .amount-wrap { position: relative; }
   .amount-wrap .prefix {
@@ -233,7 +233,7 @@
   }
   .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
-  /* ---------- Table ---------- */
+  /* ---------- Tables ---------- */
   .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
   .toolbar > div { min-width: 170px; flex: 1; }
   .toolbar .form-group { margin-bottom: 0; }
@@ -253,7 +253,10 @@
   .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .badge-synced { background: rgba(52,211,153,0.12); color: #6ee7b7; }
   .badge-pending { background: rgba(251,191,36,0.12); color: #fcd34d; }
+  .badge-off { background: rgba(248,113,113,0.12); color: #fca5a5; }
+  .badge-none { background: rgba(138,151,176,0.12); color: #cbd5e1; }
   .empty { text-align: center; color: var(--muted); padding: 36px; }
+  .small-btn { padding: 6px 10px; font-size: 11px; }
 
   /* ---------- Modals ---------- */
   .modal-overlay {
@@ -346,20 +349,16 @@
   <section id="collectorView" class="view-section active">
 
     <div id="loginCard" class="card narrow hidden">
-      <div class="card-head" style="margin-bottom:6px;">
-        <div>
-          <h2>Collector sign-in</h2>
-          <div class="card-sub" style="margin:4px 0 0;">Enter your agent ID and PIN to start collecting.</div>
-        </div>
-      </div>
+      <h2>Collector sign-in</h2>
+      <div class="card-sub">Use the email and password your supervisor gave you.</div>
       <form id="loginForm">
         <div class="form-group">
-          <label for="loginAgent">Agent ID</label>
-          <input type="text" id="loginAgent" autocomplete="username" required placeholder="e.g. COL-8492">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" autocomplete="username" required placeholder="name@gmail.com">
         </div>
         <div class="form-group">
-          <label for="loginPin">PIN</label>
-          <input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password" required>
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" required>
         </div>
         <div id="loginError" class="error"></div>
         <button type="submit" class="btn-primary">Sign in</button>
@@ -374,6 +373,8 @@
         </div>
         <div class="card-actions">
           <span id="agentBadge" class="agent-chip"></span>
+          <button class="btn" onclick="openPasswordModal()">Password</button>
+          <button class="btn" onclick="openCollectorPasswordModal()">Password</button>
           <button class="btn" onclick="signOut()">Sign out</button>
         </div>
       </div>
@@ -460,6 +461,55 @@
       </div>
     </div>
 
+    <!-- Collectors -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Collectors</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Add a collector with their email and a temporary password. They change it at first sign-in.</div>
+        </div>
+      </div>
+
+      <form id="addCollectorForm" class="grid-form" style="margin-bottom:14px;">
+        <div class="form-group">
+          <label for="newCollectorId">Collector ID</label>
+          <input type="text" id="newCollectorId" placeholder="COL-1234" required pattern="COL-\d{4}" title="Format: COL-1234">
+        </div>
+        <div class="form-group">
+          <label for="newCollectorName">Full name</label>
+          <input type="text" id="newCollectorName" required>
+        </div>
+        <div class="form-group">
+          <label for="newCollectorEmail">Email (Gmail)</label>
+          <input type="email" id="newCollectorEmail" required placeholder="name@gmail.com">
+        </div>
+        <div class="form-group">
+          <label for="newCollectorPassword">Temporary password</label>
+          <input type="text" id="newCollectorPassword" required minlength="8" placeholder="At least 8 characters">
+        </div>
+        <div>
+          <button type="submit" class="btn-block">Add collector</button>
+        </div>
+      </form>
+      <div id="collectorAdminMsg" class="error"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Collector ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="collectorsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Ledger -->
     <div class="card">
       <div class="card-head">
         <div>
@@ -519,6 +569,43 @@
         </table>
       </div>
     </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div class="card-head">
+        <div>
+          <h2>Collectors</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Add a collector with their Gmail address and a temporary password, then share it with them securely.</div>
+        </div>
+      </div>
+      <form id="addCollectorForm" class="toolbar" style="align-items:flex-end;">
+        <div class="form-group">
+          <label for="newCollectorId">Collector ID</label>
+          <input type="text" id="newCollectorId" placeholder="COL-1234" required>
+        </div>
+        <div class="form-group">
+          <label for="newCollectorName">Full name</label>
+          <input type="text" id="newCollectorName" required>
+        </div>
+        <div class="form-group">
+          <label for="newCollectorEmail">Gmail address</label>
+          <input type="email" id="newCollectorEmail" placeholder="name@gmail.com" required>
+        </div>
+        <div class="form-group">
+          <label for="newCollectorPassword">Temporary password</label>
+          <input type="text" id="newCollectorPassword" minlength="8" required>
+        </div>
+        <button type="submit" class="btn-solid" style="height:44px;">Add collector</button>
+      </form>
+      <div id="addCollectorMsg" class="error"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Email</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="collectorsBody"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -568,7 +655,7 @@
   </div>
 </div>
 
-<!-- Change admin password -->
+<!-- Change password (admin or collector) -->
 <div id="passwordModal" class="modal-overlay">
   <div class="modal-card">
     <h3>Change password</h3>
@@ -600,13 +687,8 @@ const CONFIG = {
   zone: 'Kissy Market',
   supabaseUrl: 'https://zguyhvdbaxmfshvwwywf.supabase.co',
   syncEndpoint: 'https://zguyhvdbaxmfshvwwywf.supabase.co/rest/v1/transactions?on_conflict=id',
-  apiKey: 'sb_publishable_6z7hcOayCqJRd6R8fa7suQ_AA9IPmpn',
-  // Collector PINs are disabled (null) until Supabase Auth sign-in is in place.
-  // A collector with no PIN cannot sign in.
-  collectors: [
-    { id: 'COL-8492', name: 'Collector 8492', pin: null },
-    { id: 'COL-8411', name: 'Collector 8411', pin: null }
-  ]
+  collectorsFunction: 'https://zguyhvdbaxmfshvwwywf.supabase.co/functions/v1/admin-collectors',
+  apiKey: 'sb_publishable_6z7hcOayCqJRd6R8fa7suQ_AA9IPmpn'
 };
 
 /* Sample register, used only if the server register cannot be loaded. */
@@ -618,8 +700,18 @@ let TAXPAYERS = [
 ];
 
 /* ---------- State and storage ---------- */
-const KEYS = { ledger: 'smc_ledger', session: 'smc_session', admin: 'smc_admin' };
-const state = { collector: null, selected: null, ledger: [], serverRows: null, adminToken: null, adminOk: false, syncing: false };
+const KEYS = { ledger: 'smc_ledger', collector: 'smc_collector_session', admin: 'smc_admin' };
+const state = {
+  collector: null,        // { id, name, active } for the signed-in collector
+  session: null,          // { access_token, refresh_token, expires_at, user_id } for the collector
+  selected: null,
+  ledger: [],
+  serverRows: null,
+  adminToken: null,
+  adminOk: false,
+  syncing: false,
+  pwTarget: null          // 'admin' or 'collector' for the password modal
+};
 
 const $ = id => document.getElementById(id);
 
@@ -644,10 +736,74 @@ function fmt(n) { return 'Le ' + Math.round(Number(n) || 0).toLocaleString('en-U
 function fmtDateTime(iso) { return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
 function isToday(iso) { return new Date(iso).toDateString() === new Date().toDateString(); }
 
+/* ---------- Auth helpers ---------- */
+function sessionFromAuthResponse(d) {
+  return {
+    access_token: d.access_token,
+    refresh_token: d.refresh_token,
+    expires_at: Date.now() + (d.expires_in || 3600) * 1000,
+    user_id: d.user ? d.user.id : null
+  };
+}
+
+async function passwordLogin(email, password) {
+  const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) throw new Error('Sign-in failed');
+  const d = await res.json();
+  if (!d.access_token) throw new Error('No access token returned');
+  return sessionFromAuthResponse(d);
+}
+
+async function refreshSession(sess) {
+  const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey },
+    body: JSON.stringify({ refresh_token: sess.refresh_token })
+  });
+  if (!res.ok) throw new Error('Session expired');
+  return sessionFromAuthResponse(await res.json());
+}
+
+// Returns a usable collector access token, refreshing it when needed. Null if the collector must sign in again.
+async function collectorToken() {
+  const s = state.session;
+  if (!s) return null;
+  if (Date.now() < s.expires_at - 60000) return s.access_token;
+  try {
+    state.session = await refreshSession(s);
+    writeStore(KEYS.collector, state.session);
+    return state.session.access_token;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchOwnCollector(token) {
+  const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?select=id,name,active&limit=1', {
+    headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + token }
+  });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows[0] || null;
+}
+
+function collectorSignedOut(message) {
+  state.session = null;
+  state.collector = null;
+  localStorage.removeItem(KEYS.collector);
+  resetForm();
+  showCollectorState();
+  if (message) $('loginError').textContent = message;
+}
+
 /* ---------- View switching ---------- */
 function switchView(view, btn) {
   if (view === 'admin' && !state.adminOk) {
-    openAdminGate(btn);
+    openAdminGate();
     return;
   }
   activateView(view, btn);
@@ -660,7 +816,7 @@ function activateView(view, btn) {
   const tabs = document.querySelectorAll('.segmented button');
   const target = btn || tabs[view === 'admin' ? 1 : 0];
   if (target) target.classList.add('active');
-  if (view === 'admin') { renderAdmin(); loadServerLedger(); }
+  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); }
 }
 
 function openAdminGate() {
@@ -678,7 +834,8 @@ $('adminGateForm').addEventListener('submit', async e => {
   e.preventDefault();
   $('adminGateError').textContent = 'Signing in…';
   try {
-    state.adminToken = await signInAdmin($('adminEmail').value.trim(), $('adminPassword').value);
+    const sess = await passwordLogin($('adminEmail').value.trim(), $('adminPassword').value);
+    state.adminToken = sess.access_token;
     state.adminOk = true;
     sessionStorage.setItem(KEYS.admin, state.adminToken);
     $('adminGate').classList.remove('open');
@@ -696,28 +853,32 @@ function showCollectorState() {
   if (signedIn) $('agentBadge').textContent = state.collector.id;
 }
 
-$('loginForm').addEventListener('submit', e => {
+$('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const id = $('loginAgent').value.trim().toUpperCase();
-  const pin = $('loginPin').value;
-  const c = CONFIG.collectors.find(x => x.id === id);
-  if (!c || !c.pin || c.pin !== pin) {
-    $('loginError').textContent = 'Incorrect agent ID or PIN.';
-    return;
+  $('loginError').textContent = 'Signing in…';
+  try {
+    const sess = await passwordLogin($('loginEmail').value.trim(), $('loginPassword').value);
+    const row = await fetchOwnCollector(sess.access_token);
+    if (!row) throw new Error('not a collector');
+    if (!row.active) {
+      $('loginError').textContent = 'This account is not active. Contact your supervisor.';
+      return;
+    }
+    state.session = sess;
+    state.collector = row;
+    writeStore(KEYS.collector, sess);
+    $('loginForm').reset();
+    $('loginError').textContent = '';
+    showCollectorState();
+    renderAll();
+    syncPending(false);
+  } catch (err) {
+    $('loginError').textContent = 'Incorrect email or password.';
   }
-  state.collector = c;
-  sessionStorage.setItem(KEYS.session, c.id);
-  $('loginForm').reset();
-  $('loginError').textContent = '';
-  showCollectorState();
-  renderAll();
 });
 
 function signOut() {
-  state.collector = null;
-  sessionStorage.removeItem(KEYS.session);
-  resetForm();
-  showCollectorState();
+  collectorSignedOut('');
 }
 
 /* ---------- Taxpayer search ---------- */
@@ -853,6 +1014,9 @@ function updateConnectionPill() {
   if (!navigator.onLine) {
     pill.className = 'sync-pill offline';
     pill.textContent = 'Offline · ' + pending + ' waiting';
+  } else if (pending && !state.collector) {
+    pill.className = 'sync-pill pending';
+    pill.textContent = pending + ' waiting · sign in to sync';
   } else if (pending) {
     pill.className = 'sync-pill pending';
     pill.textContent = 'Syncing · ' + pending + ' waiting';
@@ -867,6 +1031,15 @@ async function syncPending(manual) {
   const pending = state.ledger.filter(t => t.syncStatus === 'pending');
   if (!pending.length || !navigator.onLine) { updateConnectionPill(); return; }
 
+  const token = await collectorToken();
+  if (!token) {
+    // Records stay queued. A collector must sign in again to upload them.
+    updateConnectionPill();
+    return;
+  }
+
+  const token = await collectorAccessToken();
+  if (!token) { updateConnectionPill(); return; }
   state.syncing = true;
   for (const tx of pending.slice().reverse()) { // upload oldest first
     try {
@@ -875,7 +1048,7 @@ async function syncPending(manual) {
         headers: {
           'Content-Type': 'application/json',
           'apikey': CONFIG.apiKey,
-          'Authorization': 'Bearer ' + CONFIG.apiKey,
+          'Authorization': 'Bearer ' + token,
           'Prefer': 'resolution=ignore-duplicates'
         },
         body: JSON.stringify({
@@ -885,6 +1058,11 @@ async function syncPending(manual) {
           reference: tx.reference, created_at: tx.createdAt
         })
       });
+      if (res.status === 401 || res.status === 403) {
+        // Account was turned off, or the session is no longer valid.
+        collectorSignedOut('Your account is not active or your session ended. Please sign in again.');
+        break;
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       tx.syncStatus = 'synced';
       tx.syncedAt = new Date().toISOString();
@@ -895,7 +1073,7 @@ async function syncPending(manual) {
   persistLedger();
   state.syncing = false;
   renderAll();
-  if (manual && navigator.onLine && state.ledger.some(t => t.syncStatus === 'pending')) {
+  if (manual && navigator.onLine && state.ledger.some(t => t.syncStatus === 'pending') && state.collector) {
     alert('Some records could not be uploaded. They will retry automatically.');
   }
 }
@@ -903,7 +1081,7 @@ async function syncPending(manual) {
 window.addEventListener('online', () => syncPending(false));
 window.addEventListener('offline', updateConnectionPill);
 
-/* ---------- Server connection (Supabase) ---------- */
+/* ---------- Server ledger (admin) ---------- */
 function sourceRows() { return state.serverRows || state.ledger; }
 
 function mapServerRow(r) {
@@ -912,18 +1090,6 @@ function mapServerRow(r) {
     zone: r.zone, collectorId: r.collector_id, levy: r.levy, amount: Number(r.amount),
     method: r.payment_method, reference: r.reference, createdAt: r.created_at, syncStatus: 'synced'
   };
-}
-
-async function signInAdmin(email, password) {
-  const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/token?grant_type=password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey },
-    body: JSON.stringify({ email, password })
-  });
-  if (!res.ok) throw new Error('Sign-in failed: HTTP ' + res.status);
-  const data = await res.json();
-  if (!data.access_token) throw new Error('No access token returned');
-  return data.access_token;
 }
 
 function adminSessionEnded() {
@@ -964,6 +1130,100 @@ async function loadTaxpayers() {
     }
   } catch (err) {
     // keep the built-in sample register if the server cannot be reached
+  }
+}
+
+/* ---------- Collector management (admin) ---------- */
+let collectorList = [];
+
+async function loadCollectors() {
+  if (!state.adminToken || !navigator.onLine) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?select=id,name,email,active,user_id&order=id.asc', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken }
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    collectorList = await res.json();
+    renderCollectors();
+  } catch (err) {
+    $('collectorAdminMsg').textContent = 'Could not load collectors. Check your connection.';
+  }
+}
+
+function renderCollectors() {
+  const body = $('collectorsBody');
+  if (!collectorList.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty">No collectors yet. Add one above.</td></tr>';
+    return;
+  }
+  body.innerHTML = collectorList.map(c => {
+    let status;
+    if (!c.user_id) status = '<span class="badge badge-none">No login</span>';
+    else if (c.active) status = '<span class="badge badge-synced">Active</span>';
+    else status = '<span class="badge badge-off">Off</span>';
+    const action = c.user_id
+      ? `<button class="btn small-btn ${c.active ? 'btn-danger' : ''}" onclick="setCollectorActive('${esc(c.id)}', ${!c.active})">${c.active ? 'Turn off' : 'Turn on'}</button>`
+      : '';
+    return `<tr>
+      <td><strong>${esc(c.id)}</strong></td>
+      <td>${esc(c.name)}</td>
+      <td>${esc(c.email || '—')}</td>
+      <td>${status}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function callCollectorFunction(payload) {
+  const res = await fetch(CONFIG.collectorsFunction, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken },
+    body: JSON.stringify(payload)
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* empty body */ }
+  if (res.status === 401) { adminSessionEnded(); throw new Error('session'); }
+  if (!res.ok) throw new Error(data.error || 'Request failed (HTTP ' + res.status + ')');
+  return data;
+}
+
+$('addCollectorForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('collectorAdminMsg');
+  msg.className = 'muted';
+  msg.textContent = 'Adding collector…';
+  try {
+    await callCollectorFunction({
+      action: 'create',
+      collector_id: $('newCollectorId').value,
+      name: $('newCollectorName').value,
+      email: $('newCollectorEmail').value,
+      password: $('newCollectorPassword').value
+    });
+    msg.className = 'success';
+    msg.textContent = 'Collector added. Share the email and temporary password with them securely.';
+    $('addCollectorForm').reset();
+    loadCollectors();
+  } catch (err) {
+    if (err.message === 'session') return;
+    msg.className = 'error';
+    msg.textContent = err.message;
+  }
+});
+
+async function setCollectorActive(id, active) {
+  const msg = $('collectorAdminMsg');
+  if (!active && !confirm('Turn off ' + id + '? They will not be able to sign in or record payments.')) return;
+  try {
+    await callCollectorFunction({ action: 'set_active', collector_id: id, active });
+    msg.className = 'success';
+    msg.textContent = (active ? 'Turned on ' : 'Turned off ') + id + '.';
+    loadCollectors();
+  } catch (err) {
+    if (err.message === 'session') return;
+    msg.className = 'error';
+    msg.textContent = err.message;
   }
 }
 
@@ -1041,9 +1301,11 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
-/* ---------- Admin password change ---------- */
+/* ---------- Password change (admin or collector) ---------- */
 function openPasswordModal() {
-  if (!state.adminToken) return alert('Please sign in as an admin first.');
+  const isAdmin = state.adminOk && state.adminToken && document.getElementById('adminView').classList.contains('active');
+  if (!isAdmin && !state.collector) return alert('Please sign in first.');
+  state.pwTarget = isAdmin ? 'admin' : 'collector';
   $('newPassword').value = '';
   $('confirmPassword').value = '';
   $('passwordError').textContent = '';
@@ -1058,13 +1320,23 @@ $('passwordForm').addEventListener('submit', async e => {
   if (pw !== $('confirmPassword').value) { $('passwordError').textContent = 'The two passwords do not match.'; return; }
   if (pw.length < 8) { $('passwordError').textContent = 'Use at least 8 characters.'; return; }
   $('passwordError').textContent = 'Saving…';
+
+  const token = state.pwTarget === 'admin' ? state.adminToken : await collectorToken();
+  if (!token) {
+    $('passwordError').textContent = 'Your session has ended. Please sign in again.';
+    return;
+  }
   try {
     const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/user', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken },
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ password: pw })
     });
-    if (res.status === 401) { closePasswordModal(); return adminSessionEnded(); }
+    if (res.status === 401) {
+      closePasswordModal();
+      if (state.pwTarget === 'admin') return adminSessionEnded();
+      return collectorSignedOut('Your session has ended. Please sign in again.');
+    }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     closePasswordModal();
     alert('Your password has been changed.');
@@ -1110,15 +1382,201 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+/* ---------- Collector accounts (email and password) ---------- */
+function readCollectorSession() {
+  try { return JSON.parse(sessionStorage.getItem(KEYS.session) || 'null'); }
+  catch (e) { return null; }
+}
+
+function saveCollectorSession(session) {
+  state.collectorSession = session;
+  state.collector = session ? session.collector : null;
+  if (session) sessionStorage.setItem(KEYS.session, JSON.stringify(session));
+  else sessionStorage.removeItem(KEYS.session);
+}
+
+async function authRequest(grantType, payload) {
+  const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/token?grant_type=' + grantType, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+function sessionFromTokens(data, collector) {
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: Date.now() + (data.expires_in || 3600) * 1000,
+    collector
+  };
+}
+
+async function signInCollector(email, password) {
+  const data = await authRequest('password', { email, password });
+  const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?select=id,name,active&user_id=eq.' + data.user.id, {
+    headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + data.access_token }
+  });
+  const rows = res.ok ? await res.json() : [];
+  if (!rows.length || !rows[0].active) throw new Error('not_collector');
+  return sessionFromTokens(data, { id: rows[0].id, name: rows[0].name });
+}
+
+// Returns a valid access token for the signed-in collector, refreshing it when needed.
+async function collectorAccessToken() {
+  const s = state.collectorSession;
+  if (!s) return null;
+  if (Date.now() < s.expiresAt - 60000) return s.accessToken;
+  try {
+    const data = await authRequest('refresh_token', { refresh_token: s.refreshToken });
+    saveCollectorSession(sessionFromTokens(data, s.collector));
+    return data.access_token;
+  } catch (err) {
+    if (err instanceof TypeError) return null; // network problem: keep the session, try later
+    saveCollectorSession(null);
+    resetForm();
+    showCollectorState();
+    alert('Your session has ended. Please sign in again so your records can upload.');
+    return null;
+  }
+}
+
+function openCollectorPasswordModal() {
+  $('cNewPassword').value = '';
+  $('cConfirmPassword').value = '';
+  $('cPasswordError').textContent = '';
+  $('collectorPasswordModal').classList.add('open');
+  setTimeout(() => $('cNewPassword').focus(), 60);
+}
+function closeCollectorPasswordModal() { $('collectorPasswordModal').classList.remove('open'); }
+
+$('collectorPasswordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pw = $('cNewPassword').value;
+  if (pw !== $('cConfirmPassword').value) { $('cPasswordError').textContent = 'The two passwords do not match.'; return; }
+  if (pw.length < 8) { $('cPasswordError').textContent = 'Use at least 8 characters.'; return; }
+  const token = await collectorAccessToken();
+  if (!token) { closeCollectorPasswordModal(); return; }
+  $('cPasswordError').textContent = 'Saving…';
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/auth/v1/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ password: pw })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    closeCollectorPasswordModal();
+    alert('Your password has been changed.');
+  } catch (err) {
+    $('cPasswordError').textContent = 'Could not change the password. Check your connection and try again.';
+  }
+});
+
+/* ---------- Admin: collector management ---------- */
+async function loadCollectors() {
+  if (!state.adminToken) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?select=id,name,email,active&order=id.asc', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken }
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    state.collectorsList = await res.json();
+    renderCollectors();
+  } catch (err) {
+    // keep the last list shown
+  }
+}
+
+function renderCollectors() {
+  const body = $('collectorsBody');
+  if (!state.collectorsList.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty">No collectors yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = state.collectorsList.map(c => `
+    <tr>
+      <td><strong>${esc(c.id)}</strong></td>
+      <td>${esc(c.name)}</td>
+      <td>${esc(c.email || '—')}</td>
+      <td>${c.active
+        ? '<span class="badge badge-synced">Active</span>'
+        : '<span class="badge badge-pending">Inactive</span>'}</td>
+      <td><button class="btn" onclick="setCollectorActive('${esc(c.id)}', ${!c.active})">${c.active ? 'Deactivate' : 'Activate'}</button></td>
+    </tr>`).join('');
+}
+
+async function setCollectorActive(id, active) {
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': CONFIG.apiKey,
+        'Authorization': 'Bearer ' + state.adminToken,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ active })
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    await loadCollectors();
+  } catch (err) {
+    alert('Could not update this collector. Please try again.');
+  }
+}
+
+$('addCollectorForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('addCollectorMsg');
+  msg.textContent = 'Adding collector…';
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/functions/v1/create-collector', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': CONFIG.apiKey,
+        'Authorization': 'Bearer ' + state.adminToken
+      },
+      body: JSON.stringify({
+        id: $('newCollectorId').value,
+        name: $('newCollectorName').value,
+        email: $('newCollectorEmail').value,
+        password: $('newCollectorPassword').value
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) { msg.textContent = data.error || 'Could not add the collector.'; return; }
+    msg.textContent = data.name + ' was added. Share the temporary password with them securely.';
+    $('addCollectorForm').reset();
+    loadCollectors();
+  } catch (err) {
+    msg.textContent = 'Could not reach the server. Check your connection and try again.';
+  }
+});
+
 /* ---------- Initial render ---------- */
 function renderAll() { renderAdmin(); }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   state.ledger = readStore(KEYS.ledger, []);
   state.adminToken = sessionStorage.getItem(KEYS.admin);
   state.adminOk = !!state.adminToken;
-  const sid = sessionStorage.getItem(KEYS.session);
-  state.collector = CONFIG.collectors.find(c => c.id === sid) || null;
+
+  // Restore a collector session if there is one, and check the account is still active.
+  state.session = readStore(KEYS.collector, null);
+  if (state.session) {
+    const token = await collectorToken();
+    const row = token ? await fetchOwnCollector(token) : null;
+    if (row && row.active) {
+      state.collector = row;
+    } else {
+      collectorSignedOut('');
+    }
+  }
 
   showCollectorState();
   renderAll();
