@@ -18,3 +18,8 @@ Serve the folder over HTTPS (for example Netlify Drop, Vercel or Cloudflare Page
 - Do not put a secret or service-role key in `index.html`. Only the publishable key belongs there.
 
 Designed by Alhaji Abu Koroma
+
+## Database
+The Supabase schema lives in `supabase/migrations/` and is applied in filename order:
+- `20261019200900_create_municipal_schema.sql`: taxpayers, collectors, transactions, row-level security, sample data
+- `20261019210100_add_admin_access.sql`: admin accounts and their read access
