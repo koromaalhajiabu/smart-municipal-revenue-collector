@@ -38,6 +38,23 @@ function validId(id: string) {
   return /^COL-\d{3,6}$/.test(id);
 }
 
+// Stands in for leaked-password checks, which need a paid Supabase plan.
+const COMMON_PASSWORDS = new Set([
+  "password", "password1", "password123", "12345678", "123456789", "1234567890", "11111111",
+  "00000000", "qwerty123", "qwertyui", "iloveyou", "admin123", "welcome1", "welcome123",
+  "letmein1", "monkey123", "dragon123", "abc12345", "abcd1234", "sierraleone", "freetown1",
+  "freetown123", "council123", "collector1", "changeme1", "passw0rd",
+]);
+
+function weakPassword(pw: string) {
+  const p = pw.toLowerCase();
+  if (COMMON_PASSWORDS.has(p)) return true;
+  if (/^(.)\1+$/.test(p)) return true;          // one character repeated
+  if (/^\d+$/.test(p) && p.length < 12) return true; // digits only and short
+  if (/^[a-z]+$/.test(p) && p.length < 12) return true; // letters only and short
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -84,6 +101,7 @@ Deno.serve(async (req) => {
     if (name.length < 2 || name.length > 100) return json({ error: "Enter the collector's full name." }, 400);
     if (!validEmail(email)) return json({ error: "Enter a valid email address." }, 400);
     if (password.length < 8) return json({ error: "The temporary password must be at least 8 characters." }, 400);
+    if (weakPassword(password)) return json({ error: "That password is too common or too simple. Mix letters and numbers, or use a longer password." }, 400);
 
     const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: "POST",
@@ -131,6 +149,7 @@ Deno.serve(async (req) => {
     if (name.length < 2 || name.length > 100) return json({ error: "Enter the collector's full name." }, 400);
     if (!validEmail(email)) return json({ error: "Enter a valid email address." }, 400);
     if (password && password.length < 8) return json({ error: "The new password must be at least 8 characters." }, 400);
+    if (password && weakPassword(password)) return json({ error: "That password is too common or too simple. Mix letters and numbers, or use a longer password." }, 400);
 
     if (existing.user_id) {
       const authBody: Record<string, unknown> = { email, email_confirm: true };

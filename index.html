@@ -1435,6 +1435,7 @@ $('collectorPasswordForm').addEventListener('submit', async e => {
   const pw = $('cNewPassword').value;
   if (pw !== $('cConfirmPassword').value) { $('cPasswordError').textContent = 'The two passwords do not match.'; return; }
   if (pw.length < 8) { $('cPasswordError').textContent = 'Use at least 8 characters.'; return; }
+  if (isWeakPassword(pw)) { $('cPasswordError').textContent = 'That password is too common or too simple. Mix letters and numbers, or use a longer password.'; return; }
   const token = await collectorAccessToken();
   if (!token) { closeCollectorPasswordModal(); return; }
   $('cPasswordError').textContent = 'Saving…';
@@ -1886,6 +1887,17 @@ async function reviewHandover(id, status) {
   } catch (err) {
     alert('Could not update this handover. Please try again.');
   }
+}
+
+/* ---------- Password checks (stands in for leaked-password checks) ---------- */
+const COMMON_PASSWORDS = new Set(['password', 'password1', 'password123', '12345678', '123456789', '1234567890', '11111111', '00000000', 'qwerty123', 'qwertyui', 'iloveyou', 'admin123', 'welcome1', 'welcome123', 'letmein1', 'monkey123', 'dragon123', 'abc12345', 'abcd1234', 'sierraleone', 'freetown1', 'freetown123', 'council123', 'collector1', 'changeme1', 'passw0rd']);
+function isWeakPassword(pw) {
+  const p = pw.toLowerCase();
+  if (COMMON_PASSWORDS.has(p)) return true;
+  if (/^(.)\1+$/.test(p)) return true;
+  if (/^\d+$/.test(p) && p.length < 12) return true;
+  if (/^[a-z]+$/.test(p) && p.length < 12) return true;
+  return false;
 }
 
 /* ---------- Council payment accounts ---------- */
