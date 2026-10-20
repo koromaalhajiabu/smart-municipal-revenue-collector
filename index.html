@@ -896,6 +896,7 @@ function selectTaxpayer(id) {
   $('taxpayerInfo').classList.remove('hidden');
   $('searchResults').classList.add('hidden');
   $('searchMsg').textContent = '';
+  $('submitBtn').disabled = false;
   showFormError('');
 }
 
@@ -915,7 +916,8 @@ function resetForm() {
   $('searchResults').innerHTML = '';
   $('searchMsg').textContent = '';
   $('referenceGroup').classList.add('hidden');
-  $('submitBtn').disabled = false;
+  // Confirm stays locked until a taxpayer has been selected.
+  $('submitBtn').disabled = true;
   showFormError('');
 }
 
@@ -923,7 +925,7 @@ function resetForm() {
 $('collectionForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!state.collector) return;
-  if (!state.selected) return showFormError('Search and select a taxpayer first.');
+  if (!state.selected) return showFormError('Find a taxpayer above and tap their name first.');
 
   const amount = Math.round(Number($('amount').value));
   if (!(amount > 0)) return showFormError('Enter an amount greater than zero.');
