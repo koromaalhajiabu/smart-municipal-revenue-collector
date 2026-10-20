@@ -542,6 +542,10 @@
           <input type="email" id="newCollectorEmail" placeholder="name@gmail.com" required>
         </div>
         <div class="form-group">
+          <label for="newCollectorEmailConfirm">Confirm Gmail address</label>
+          <input type="email" id="newCollectorEmailConfirm" placeholder="name@gmail.com" required>
+        </div>
+        <div class="form-group">
           <label for="newCollectorPassword">Temporary password</label>
           <input type="text" id="newCollectorPassword" minlength="8" required>
         </div>
@@ -619,6 +623,10 @@
       <div class="form-group" style="text-align:left;">
         <label for="editEmail">Gmail address</label>
         <input type="email" id="editEmail" required>
+        </div>
+        <div class="form-group" style="text-align:left;">
+          <label for="editEmailConfirm">Confirm Gmail address</label>
+          <input type="email" id="editEmailConfirm" required>
       </div>
       <div class="form-group" style="text-align:left;">
         <label for="editPassword">New password (leave blank to keep the current one)</label>
@@ -1341,6 +1349,11 @@ async function setCollectorActive(id, active) {
 $('addCollectorForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = $('addCollectorMsg');
+  const addEmail = $('newCollectorEmail').value.trim().toLowerCase();
+  if (addEmail !== $('newCollectorEmailConfirm').value.trim().toLowerCase()) {
+    msg.textContent = 'The two email addresses do not match.';
+    return;
+  }
   msg.textContent = 'Adding collector…';
   try {
     const res = await fetch(CONFIG.supabaseUrl + '/functions/v1/create-collector', {
@@ -1402,6 +1415,7 @@ function editCollector(id) {
   $('editCollectorId').textContent = c.id;
   $('editName').value = c.name;
   $('editEmail').value = c.email || '';
+  $('editEmailConfirm').value = c.email || '';
   $('editPassword').value = '';
   $('editError').textContent = '';
   $('editCollectorModal').classList.add('open');
@@ -1415,6 +1429,10 @@ function closeEditCollectorModal() {
 
 $('editCollectorForm').addEventListener('submit', async e => {
   e.preventDefault();
+  if ($('editEmail').value.trim().toLowerCase() !== $('editEmailConfirm').value.trim().toLowerCase()) {
+    $('editError').textContent = 'The two email addresses do not match.';
+    return;
+  }
   $('editError').textContent = 'Saving…';
   const result = await manageCollector({
     action: 'update',
