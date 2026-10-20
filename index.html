@@ -395,6 +395,7 @@
           <div class="meta" id="infoOwner"></div>
           <div class="meta" id="infoStall"></div>
           <div class="meta" id="infoZone"></div>
+          <div class="meta" id="infoAddress"></div>
           <span class="rate" id="infoRate"></span>
         </div>
 
@@ -506,12 +507,14 @@
             <tr>
               <th>Receipt</th>
               <th>Taxpayer / business</th>
+              <th>Stall</th>
               <th>Levy</th>
               <th>Zone</th>
               <th>Collector</th>
               <th>Amount</th>
               <th>Method</th>
               <th>Reference</th>
+              <th>Location</th>
               <th>Date / time</th>
               <th>Sync</th>
             </tr>
@@ -839,6 +842,7 @@ function selectTaxpayer(id) {
   $('infoOwner').textContent = 'Owner · ' + state.selected.owner;
   $('infoStall').textContent = 'Stall ' + state.selected.stall + ' · ' + state.selected.id;
   $('infoZone').textContent = 'Zone · ' + state.selected.zone;
+  $('infoAddress').textContent = 'Address · ' + (state.selected.address || 'Not recorded yet') + (state.selected.latitude != null ? ' · map point saved' : '');
   $('infoRate').textContent = 'Standard rate ' + fmt(state.selected.rate);
   $('taxpayerInfo').classList.remove('hidden');
   $('searchResults').classList.add('hidden');
@@ -867,7 +871,7 @@ function resetForm() {
 }
 
 /* ---------- Recording a collection ---------- */
-$('collectionForm').addEventListener('submit', e => {
+$('collectionForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!state.collector) return;
   if (!state.selected) return showFormError('Search and select a taxpayer first.');
@@ -886,6 +890,7 @@ $('collectionForm').addEventListener('submit', e => {
   }
 
   $('submitBtn').disabled = true; // prevents double submission
+  const location = await captureLocation();
   const seqKey = 'smc_seq_' + state.collector.id;
   const seq = Number(readStore(seqKey, 0)) + 1;
   if (!writeStore(seqKey, seq)) { $('submitBtn').disabled = false; return; }
@@ -896,6 +901,7 @@ $('collectionForm').addEventListener('submit', e => {
     taxpayerId: state.selected.id,
     business: state.selected.business,
     stall: state.selected.stall,
+    owner: state.selected.owner,
     zone: state.selected.zone,
     collectorId: state.collector.id,
     levy: $('levyType').value,
@@ -903,6 +909,9 @@ $('collectionForm').addEventListener('submit', e => {
     method,
     reference: method === 'Cash' ? '' : ref,
     createdAt: new Date().toISOString(),
+    collectorLat: location ? location.lat : null,
+    collectorLng: location ? location.lng : null,
+    locationAccuracy: location ? location.accuracy : null,
     syncStatus: 'pending'
   };
 
@@ -912,6 +921,18 @@ $('collectionForm').addEventListener('submit', e => {
   renderAll();
   syncPending(false);
 });
+
+// Returns the collector's position, or null if it can't be read. Never blocks a payment for long.
+function captureLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  });
+}
 
 function showReceipt(tx) {
   $('resReceipt').textContent = tx.receipt;
@@ -969,7 +990,10 @@ async function syncPending(manual) {
           id: tx.id, receipt_number: tx.receipt, taxpayer_id: tx.taxpayerId,
           business: tx.business, zone: tx.zone, collector_id: tx.collectorId,
           levy: tx.levy, amount: tx.amount, payment_method: tx.method,
-          reference: tx.reference, created_at: tx.createdAt
+          reference: tx.reference, created_at: tx.createdAt,
+          stall: tx.stall, owner: tx.owner,
+          collector_latitude: tx.collectorLat, collector_longitude: tx.collectorLng,
+          location_accuracy: tx.locationAccuracy
         })
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -997,7 +1021,9 @@ function mapServerRow(r) {
   return {
     id: r.id, receipt: r.receipt_number, taxpayerId: r.taxpayer_id, business: r.business,
     zone: r.zone, collectorId: r.collector_id, levy: r.levy, amount: Number(r.amount),
-    method: r.payment_method, reference: r.reference, createdAt: r.created_at, syncStatus: 'synced'
+    method: r.payment_method, reference: r.reference, createdAt: r.created_at, syncStatus: 'synced',
+    stall: r.stall, owner: r.owner,
+    collectorLat: r.collector_latitude, collectorLng: r.collector_longitude, locationAccuracy: r.location_accuracy
   };
 }
 
@@ -1046,7 +1072,8 @@ async function loadTaxpayers() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     TAXPAYERS = (await res.json()).map(r => ({
       id: r.id, business: r.business, stall: r.stall, owner: r.owner,
-      zone: r.zone, rate: Number(r.standard_rate)
+      zone: r.zone, rate: Number(r.standard_rate),
+      address: r.address, latitude: r.latitude, longitude: r.longitude
     }));
   } catch (err) {
     // keep the current list
@@ -1094,18 +1121,20 @@ function renderAdmin() {
       <tr>
         <td><strong>${esc(t.receipt)}</strong></td>
         <td>${esc(t.business)}</td>
+        <td>${esc(t.stall || '—')}</td>
         <td>${esc(t.levy)}</td>
         <td>${esc(t.zone)}</td>
         <td>${esc(t.collectorId)}</td>
         <td>${fmt(t.amount)}</td>
         <td>${esc(t.method)}</td>
         <td>${esc(t.reference || '—')}</td>
+        <td>${t.collectorLat != null ? esc(Number(t.collectorLat).toFixed(5)) + ', ' + esc(Number(t.collectorLng).toFixed(5)) : '—'}</td>
         <td>${esc(fmtDateTime(t.createdAt))}</td>
         <td>${t.syncStatus === 'synced'
           ? '<span class="badge badge-synced">Synced</span>'
           : '<span class="badge badge-pending">Pending</span>'}</td>
       </tr>`).join('')
-    : '<tr><td colspan="10" class="empty">No transactions match these filters.</td></tr>';
+    : '<tr><td colspan="12" class="empty">No transactions match these filters.</td></tr>';
 
   updateConnectionPill();
 }
@@ -1113,10 +1142,10 @@ function renderAdmin() {
 function exportCSV() {
   const rows = filteredLedger();
   if (!rows.length) return alert('Nothing to export for these filters.');
-  const header = ['Receipt', 'Taxpayer ID', 'Business', 'Stall', 'Levy', 'Zone', 'Collector', 'Amount (Le)', 'Method', 'Reference', 'Created', 'Sync status'];
+  const header = ['Receipt', 'Taxpayer ID', 'Business', 'Stall', 'Owner', 'Levy', 'Zone', 'Collector', 'Amount (Le)', 'Method', 'Reference', 'Created', 'Latitude', 'Longitude', 'Location accuracy (m)', 'Sync status'];
   const lines = [header].concat(rows.map(t => [
-    t.receipt, t.taxpayerId, t.business, t.stall, t.levy, t.zone, t.collectorId,
-    t.amount, t.method, t.reference, t.createdAt, t.syncStatus
+    t.receipt, t.taxpayerId, t.business, t.stall, t.owner, t.levy, t.zone, t.collectorId,
+    t.amount, t.method, t.reference, t.createdAt, t.collectorLat, t.collectorLng, t.locationAccuracy, t.syncStatus
   ]));
   const csv = lines.map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
