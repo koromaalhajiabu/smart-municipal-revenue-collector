@@ -397,6 +397,7 @@
           <div class="meta" id="infoZone"></div>
           <div class="meta" id="infoAddress"></div>
           <span class="rate" id="infoRate"></span>
+          <img id="infoPhoto" class="hidden" alt="Photo of the business" style="display:block;width:100%;max-width:300px;border-radius:12px;margin-top:12px;">
         </div>
 
         <div class="form-group">
@@ -608,6 +609,10 @@
         <div class="form-group">
           <label for="tpLng">Longitude</label>
           <input type="number" id="tpLng" step="any" placeholder="-13.2299">
+        </div>
+        <div class="form-group">
+          <label for="tpPhoto">Photo (optional, JPEG or PNG)</label>
+          <input type="file" id="tpPhoto" accept="image/jpeg,image/png">
         </div>
         <button type="submit" class="btn-solid" style="height:44px;">Add taxpayer</button>
       </form>
@@ -893,6 +898,10 @@ function selectTaxpayer(id) {
   $('infoZone').textContent = 'Zone · ' + state.selected.zone;
   $('infoAddress').textContent = 'Address · ' + (state.selected.address || 'Not recorded yet') + (state.selected.latitude != null ? ' · map point saved' : '');
   $('infoRate').textContent = 'Standard rate ' + fmt(state.selected.rate);
+  const photoImg = $('infoPhoto');
+  photoImg.classList.add('hidden');
+  photoImg.removeAttribute('src');
+  if (state.selected.photoPath) showTaxpayerPhoto(state.selected.photoPath);
   $('taxpayerInfo').classList.remove('hidden');
   $('searchResults').classList.add('hidden');
   $('searchMsg').textContent = '';
@@ -1124,7 +1133,7 @@ async function loadTaxpayers() {
     TAXPAYERS = (await res.json()).map(r => ({
       id: r.id, business: r.business, stall: r.stall, owner: r.owner,
       zone: r.zone, rate: Number(r.standard_rate),
-      address: r.address, latitude: r.latitude, longitude: r.longitude
+      address: r.address, latitude: r.latitude, longitude: r.longitude, photoPath: r.photo_path
     }));
   } catch (err) {
     // keep the current list
@@ -1534,6 +1543,46 @@ async function removeCollector(id) {
 }
 
 /* ---------- Admin: add taxpayer ---------- */
+// Shows a taxpayer's photo to a signed-in collector, using a link that expires after one hour.
+function showTaxpayerPhoto(path) {
+  const id = state.selected && state.selected.id;
+  collectorAccessToken().then(token => {
+    if (!token || !state.selected || state.selected.id !== id) return null;
+    return fetch(CONFIG.supabaseUrl + '/storage/v1/object/sign/taxpayer-photos/' + encodeURI(path), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ expiresIn: 3600 })
+    }).then(r => (r.ok ? r.json() : null)).then(data => {
+      if (!data || !data.signedURL || !state.selected || state.selected.id !== id) return;
+      const img = $('infoPhoto');
+      img.src = CONFIG.supabaseUrl + '/storage/v1' + data.signedURL;
+      img.classList.remove('hidden');
+    });
+  }).catch(() => {});
+}
+
+// Makes a phone photo small enough to upload quickly: longest side 1024 px, saved as JPEG.
+function shrinkPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1024 / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('encode'))), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode')); };
+    img.src = url;
+  });
+}
+
 $('addTaxpayerForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = $('addTaxpayerMsg');
@@ -1555,6 +1604,9 @@ $('addTaxpayerForm').addEventListener('submit', async e => {
   if (!row.business || !row.owner || !row.zone) { msg.textContent = 'Business, owner and zone are required.'; return; }
   if (!(row.standard_rate >= 0)) { msg.textContent = 'Enter the standard levy as a number.'; return; }
   if ((lat === null) !== (lng === null)) { msg.textContent = 'Enter both latitude and longitude, or leave both empty.'; return; }
+  const photo = $('tpPhoto').files[0] || null;
+  if (photo && !['image/jpeg', 'image/png'].includes(photo.type)) { msg.textContent = 'The photo must be a JPEG or PNG image.'; return; }
+  if (photo && photo.size > 8 * 1024 * 1024) { msg.textContent = 'The photo is too large. Choose a photo under 8 MB.'; return; }
   msg.textContent = 'Adding taxpayer…';
   try {
     const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/taxpayers', {
@@ -1570,7 +1622,29 @@ $('addTaxpayerForm').addEventListener('submit', async e => {
     if (res.status === 401) return adminSessionEnded();
     if (res.status === 409) { msg.textContent = 'That taxpayer ID is already in use.'; return; }
     if (!res.ok) { msg.textContent = 'Could not add the taxpayer. Check the details and try again.'; return; }
-    msg.textContent = row.business + ' (' + row.id + ') was added.';
+    let note = '';
+    if (photo) {
+      msg.textContent = 'Uploading photo…';
+      try {
+        const blob = await shrinkPhoto(photo);
+        const path = row.id + '.jpg';
+        const up = await fetch(CONFIG.supabaseUrl + '/storage/v1/object/taxpayer-photos/' + encodeURIComponent(path), {
+          method: 'POST',
+          headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+          body: blob
+        });
+        if (!up.ok) throw new Error('upload');
+        const link = await fetch(CONFIG.supabaseUrl + '/rest/v1/taxpayers?id=eq.' + encodeURIComponent(row.id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ photo_path: path })
+        });
+        if (!link.ok) throw new Error('link');
+      } catch (err) {
+        note = ' The taxpayer was saved, but the photo could not be uploaded. Check the connection and add the photo again.';
+      }
+    }
+    msg.textContent = row.business + ' (' + row.id + ') was added.' + note;
     $('addTaxpayerForm').reset();
   } catch (err) {
     msg.textContent = 'Could not reach the server. Check your connection and try again.';
