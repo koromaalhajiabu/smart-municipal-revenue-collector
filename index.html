@@ -564,6 +564,55 @@
         </table>
       </div>
     </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div class="card-head">
+        <div>
+          <h2>Taxpayers</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Add a business to the register. Collectors can find it straight away. Latitude and longitude are optional.</div>
+        </div>
+      </div>
+      <form id="addTaxpayerForm" class="toolbar" style="align-items:flex-end;">
+        <div class="form-group">
+          <label for="tpId">Taxpayer ID</label>
+          <input type="text" id="tpId" placeholder="TP-0004" required>
+        </div>
+        <div class="form-group">
+          <label for="tpBusiness">Business name</label>
+          <input type="text" id="tpBusiness" required>
+        </div>
+        <div class="form-group">
+          <label for="tpStall">Stall number</label>
+          <input type="text" id="tpStall" placeholder="Stall 12">
+        </div>
+        <div class="form-group">
+          <label for="tpOwner">Owner</label>
+          <input type="text" id="tpOwner" required>
+        </div>
+        <div class="form-group">
+          <label for="tpZone">Zone</label>
+          <input type="text" id="tpZone" required>
+        </div>
+        <div class="form-group">
+          <label for="tpRate">Standard levy (Le)</label>
+          <input type="number" id="tpRate" min="0" step="1" required>
+        </div>
+        <div class="form-group">
+          <label for="tpAddress">Address</label>
+          <input type="text" id="tpAddress">
+        </div>
+        <div class="form-group">
+          <label for="tpLat">Latitude</label>
+          <input type="number" id="tpLat" step="any" placeholder="8.4840">
+        </div>
+        <div class="form-group">
+          <label for="tpLng">Longitude</label>
+          <input type="number" id="tpLng" step="any" placeholder="-13.2299">
+        </div>
+        <button type="submit" class="btn-solid" style="height:44px;">Add taxpayer</button>
+      </form>
+      <div id="addTaxpayerMsg" class="error"></div>
+    </div>
   </section>
 </main>
 
@@ -1481,6 +1530,50 @@ async function removeCollector(id) {
   if (!result.ok) { alert(result.error); return; }
   loadCollectors();
 }
+
+/* ---------- Admin: add taxpayer ---------- */
+$('addTaxpayerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('addTaxpayerMsg');
+  const optionalNumber = v => (v.trim() === '' ? null : Number(v));
+  const lat = optionalNumber($('tpLat').value);
+  const lng = optionalNumber($('tpLng').value);
+  const row = {
+    id: $('tpId').value.trim().toUpperCase(),
+    business: $('tpBusiness').value.trim(),
+    stall: $('tpStall').value.trim() || '-',
+    owner: $('tpOwner').value.trim(),
+    zone: $('tpZone').value.trim(),
+    standard_rate: Number($('tpRate').value),
+    address: $('tpAddress').value.trim() || null,
+    latitude: lat,
+    longitude: lng
+  };
+  if (!/^TP-[A-Z0-9-]{2,20}$/.test(row.id)) { msg.textContent = 'Taxpayer ID must look like TP-0004.'; return; }
+  if (!row.business || !row.owner || !row.zone) { msg.textContent = 'Business, owner and zone are required.'; return; }
+  if (!(row.standard_rate >= 0)) { msg.textContent = 'Enter the standard levy as a number.'; return; }
+  if ((lat === null) !== (lng === null)) { msg.textContent = 'Enter both latitude and longitude, or leave both empty.'; return; }
+  msg.textContent = 'Adding taxpayer…';
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/taxpayers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': CONFIG.apiKey,
+        'Authorization': 'Bearer ' + state.adminToken,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (res.status === 409) { msg.textContent = 'That taxpayer ID is already in use.'; return; }
+    if (!res.ok) { msg.textContent = 'Could not add the taxpayer. Check the details and try again.'; return; }
+    msg.textContent = row.business + ' (' + row.id + ') was added.';
+    $('addTaxpayerForm').reset();
+  } catch (err) {
+    msg.textContent = 'Could not reach the server. Check your connection and try again.';
+  }
+});
 
 /* ---------- Initial render ---------- */
 function renderAll() { renderAdmin(); }
