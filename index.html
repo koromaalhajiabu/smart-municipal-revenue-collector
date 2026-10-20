@@ -574,6 +574,10 @@
           <label for="newCollectorPassword">Temporary password</label>
           <input type="text" id="newCollectorPassword" minlength="8" required>
         </div>
+        <div class="form-group">
+          <label for="newCollectorPhoto">Photo (optional, JPEG or PNG)</label>
+          <input type="file" id="newCollectorPhoto" accept="image/jpeg,image/png">
+        </div>
         <button type="submit" class="btn-solid" style="height:44px;">Add collector</button>
       </form>
       <div id="addCollectorMsg" class="error"></div>
@@ -1452,7 +1456,7 @@ $('collectorPasswordForm').addEventListener('submit', async e => {
 async function loadCollectors() {
   if (!state.adminToken) return;
   try {
-    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?select=id,name,email,active&order=id.asc', {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?select=id,name,email,active,photo_path&order=id.asc', {
       headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken }
     });
     if (res.status === 401) return adminSessionEnded();
@@ -1473,7 +1477,7 @@ function renderCollectors() {
   body.innerHTML = state.collectorsList.map(c => `
     <tr>
       <td><strong>${esc(c.id)}</strong></td>
-      <td>${esc(c.name)}</td>
+      <td>${c.photo_path ? '<img data-photo="' + esc(c.photo_path) + '" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;">' : ''}${esc(c.name)}</td>
       <td>${esc(c.email || '—')}</td>
       <td>${c.active
         ? '<span class="badge badge-synced">Active</span>'
@@ -1484,6 +1488,27 @@ function renderCollectors() {
         <button class="btn" style="color:#fecaca;" onclick="removeCollector('${esc(c.id)}')">Remove</button>
       </td>
     </tr>`).join('');
+  loadCollectorPhotos();
+}
+
+// Loads collector photos for the admin list, using links that expire after one hour.
+async function loadCollectorPhotos() {
+  if (!state.adminToken) return;
+  const imgs = document.querySelectorAll('#collectorsBody img[data-photo]');
+  for (const img of imgs) {
+    try {
+      const res = await fetch(CONFIG.supabaseUrl + '/storage/v1/object/sign/collector-photos/' + encodeURI(img.dataset.photo), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken },
+        body: JSON.stringify({ expiresIn: 3600 })
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.signedURL) img.src = CONFIG.supabaseUrl + '/storage/v1' + data.signedURL;
+    } catch (err) {
+      // leave the photo blank
+    }
+  }
 }
 
 async function setCollectorActive(id, active) {
@@ -1514,6 +1539,9 @@ $('addCollectorForm').addEventListener('submit', async e => {
     msg.textContent = 'The two email addresses do not match.';
     return;
   }
+  const photo = $('newCollectorPhoto').files[0] || null;
+  if (photo && !['image/jpeg', 'image/png'].includes(photo.type)) { msg.textContent = 'The photo must be a JPEG or PNG image.'; return; }
+  if (photo && photo.size > 8 * 1024 * 1024) { msg.textContent = 'The photo is too large. Choose a photo under 8 MB.'; return; }
   msg.textContent = 'Adding collector…';
   try {
     const res = await fetch(CONFIG.supabaseUrl + '/functions/v1/create-collector', {
@@ -1534,7 +1562,29 @@ $('addCollectorForm').addEventListener('submit', async e => {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) return adminSessionEnded();
     if (!res.ok) { msg.textContent = data.error || 'Could not add the collector.'; return; }
-    msg.textContent = data.name + ' was added. Share the temporary password with them securely.';
+    let note = '';
+    if (photo) {
+      msg.textContent = 'Uploading photo…';
+      try {
+        const blob = await shrinkPhoto(photo);
+        const path = data.id + '.jpg';
+        const up = await fetch(CONFIG.supabaseUrl + '/storage/v1/object/collector-photos/' + encodeURIComponent(path), {
+          method: 'POST',
+          headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+          body: blob
+        });
+        if (!up.ok) throw new Error('upload');
+        const link = await fetch(CONFIG.supabaseUrl + '/rest/v1/collectors?id=eq.' + encodeURIComponent(data.id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ photo_path: path })
+        });
+        if (!link.ok) throw new Error('link');
+      } catch (err) {
+        note = ' The collector was added, but the photo could not be uploaded.';
+      }
+    }
+    msg.textContent = data.name + ' was added. Share the temporary password with them securely.' + note;
     $('addCollectorForm').reset();
     loadCollectors();
   } catch (err) {
