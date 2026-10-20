@@ -436,6 +436,26 @@
         <button type="submit" id="submitBtn" class="btn-primary">Confirm &amp; generate receipt</button>
       </form>
     </div>
+  <div id="handoverCard" class="card narrow hidden" style="margin-top:18px;">
+    <div class="card-head">
+      <div>
+        <h2>End-of-day cash handover</h2>
+        <div class="card-sub" style="margin:4px 0 0;">Cash you recorded today: <strong id="handoverExpected">Le 0</strong></div>
+      </div>
+    </div>
+    <form id="handoverForm" class="toolbar" style="align-items:flex-end;">
+      <div class="form-group">
+        <label for="handoverAmount">Cash handed in (Le)</label>
+        <input type="number" id="handoverAmount" min="0" step="1" required>
+      </div>
+      <div class="form-group">
+        <label for="handoverNote">Note (optional)</label>
+        <input type="text" id="handoverNote">
+      </div>
+      <button type="submit" class="btn-solid" style="height:44px;">Submit handover</button>
+    </form>
+    <div id="handoverMsg" class="error"></div>
+  </div>
   </section>
 
   <!-- ================= ADMIN VIEW ================= -->
@@ -617,6 +637,23 @@
         <button type="submit" class="btn-solid" style="height:44px;">Add taxpayer</button>
       </form>
       <div id="addTaxpayerMsg" class="error"></div>
+    </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div class="card-head">
+        <div>
+          <h2>Cash handovers</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Compare the cash each collector reports with what the app recorded that day, then confirm or flag it.</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Collector</th><th>Recorded in app</th><th>Handed in</th><th>Difference</th><th>Note</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="handoverBody"></tbody>
+        </table>
+      </div>
     </div>
   </section>
 </main>
@@ -801,7 +838,7 @@ function activateView(view, btn) {
   const tabs = document.querySelectorAll('.segmented button');
   const target = btn || tabs[view === 'admin' ? 1 : 0];
   if (target) target.classList.add('active');
-  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); }
+  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); loadHandovers(); }
 }
 
 function openAdminGate() {
@@ -834,6 +871,8 @@ function showCollectorState() {
   const signedIn = !!state.collector;
   $('loginCard').classList.toggle('hidden', signedIn);
   $('collectorCard').classList.toggle('hidden', !signedIn);
+  $('handoverCard').classList.toggle('hidden', !signedIn);
+  renderHandover();
   if (signedIn) $('agentBadge').textContent = state.collector.id;
 }
 
@@ -1650,6 +1689,122 @@ $('addTaxpayerForm').addEventListener('submit', async e => {
     msg.textContent = 'Could not reach the server. Check your connection and try again.';
   }
 });
+
+/* ---------- Cash handover ---------- */
+let handoverRows = [];
+
+function localDateKey(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function cashRecordedToday(collectorId) {
+  return state.ledger
+    .filter(t => t.method === 'Cash' && t.collectorId === collectorId && isToday(t.createdAt))
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+}
+
+function renderHandover() {
+  if (!state.collector) return;
+  $('handoverExpected').textContent = fmt(cashRecordedToday(state.collector.id));
+}
+setInterval(() => { if (state.collector) renderHandover(); }, 5000);
+
+$('handoverForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('handoverMsg');
+  const amount = Number($('handoverAmount').value);
+  if (!(amount >= 0)) { msg.textContent = 'Enter the cash you are handing in.'; return; }
+  if (!navigator.onLine) { msg.textContent = 'Connect to the internet to submit the handover.'; return; }
+  const token = await collectorAccessToken();
+  if (!token) { msg.textContent = 'Your session has ended. Sign in again to submit.'; return; }
+  msg.textContent = 'Submitting…';
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/cash_handovers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + token, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        collector_id: state.collector.id,
+        handover_date: localDateKey(new Date()),
+        expected_amount: cashRecordedToday(state.collector.id),
+        handed_amount: amount,
+        note: $('handoverNote').value.trim() || null
+      })
+    });
+    if (res.status === 409) { msg.textContent = 'You have already submitted a handover for today. Ask the admin if it needs correcting.'; return; }
+    if (!res.ok) { msg.textContent = 'Could not submit the handover. Try again.'; return; }
+    msg.textContent = 'Handover submitted. Hand the cash to the office; the admin will confirm it.';
+    $('handoverForm').reset();
+  } catch (err) {
+    msg.textContent = 'Could not reach the server. Try again.';
+  }
+});
+
+async function loadHandovers() {
+  if (!state.adminToken) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/cash_handovers?select=*&order=handover_date.desc&limit=200', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken }
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    handoverRows = await res.json();
+    renderHandovers();
+  } catch (err) {
+    // keep the last list shown
+  }
+}
+setInterval(() => { if (state.adminOk) loadHandovers(); }, 30000);
+
+function renderHandovers() {
+  const body = $('handoverBody');
+  if (!handoverRows.length) {
+    body.innerHTML = '<tr><td colspan="8" class="empty">No handovers yet.</td></tr>';
+    return;
+  }
+  const all = sourceRows();
+  body.innerHTML = handoverRows.map(h => {
+    const recorded = all
+      .filter(t => t.method === 'Cash' && t.collectorId === h.collector_id && localDateKey(t.createdAt) === h.handover_date)
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+    const diff = Number(h.handed_amount) - recorded;
+    const diffText = diff === 0 ? 'Matches' : (diff > 0 ? 'Over by ' : 'Short by ') + fmt(Math.abs(diff));
+    const badge = h.status === 'confirmed'
+      ? '<span class="badge badge-synced">Confirmed</span>'
+      : h.status === 'discrepancy'
+        ? '<span class="badge badge-pending">Discrepancy</span>'
+        : '<span class="badge badge-pending">Awaiting review</span>';
+    return `
+      <tr>
+        <td>${esc(h.handover_date)}</td>
+        <td>${esc(h.collector_id)}</td>
+        <td>${fmt(recorded)}</td>
+        <td>${fmt(h.handed_amount)}</td>
+        <td>${esc(diffText)}</td>
+        <td>${esc(h.note || '—')}</td>
+        <td>${badge}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn" onclick="reviewHandover('${esc(h.id)}', 'confirmed')">Confirm</button>
+          <button class="btn" onclick="reviewHandover('${esc(h.id)}', 'discrepancy')">Flag</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function reviewHandover(id, status) {
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/cash_handovers?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status, reviewed_at: new Date().toISOString() })
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    await loadHandovers();
+  } catch (err) {
+    alert('Could not update this handover. Please try again.');
+  }
+}
 
 /* ---------- Initial render ---------- */
 function renderAll() { renderAdmin(); }
