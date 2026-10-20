@@ -432,6 +432,7 @@
           <div class="reference-hint">Letters and digits, at least 6 characters.</div>
         </div>
 
+        <div id="payAccount" class="taxpayer-info hidden" style="margin-bottom:14px;"></div>
         <div id="formError" class="error"></div>
         <button type="submit" id="submitBtn" class="btn-primary">Confirm &amp; generate receipt</button>
       </form>
@@ -655,6 +656,35 @@
         </table>
       </div>
     </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div class="card-head">
+        <div>
+          <h2>Council payment accounts</h2>
+          <div class="card-sub" style="margin:4px 0 0;">The numbers taxpayers pay into. Collectors see these when they choose Orange Money or Africell Money.</div>
+        </div>
+      </div>
+      <form id="paymentAccountsForm" class="toolbar" style="align-items:flex-end;">
+        <div class="form-group">
+          <label for="omNumber">Orange Money number</label>
+          <input type="text" id="omNumber" inputmode="tel" placeholder="076 000 000">
+        </div>
+        <div class="form-group">
+          <label for="omName">Account name</label>
+          <input type="text" id="omName" placeholder="Freetown City Council">
+        </div>
+        <div class="form-group">
+          <label for="amNumber">Africell Money number</label>
+          <input type="text" id="amNumber" inputmode="tel" placeholder="077 000 000">
+        </div>
+        <div class="form-group">
+          <label for="amName">Account name</label>
+          <input type="text" id="amName" placeholder="Freetown City Council">
+        </div>
+        <button type="submit" class="btn-solid" style="height:44px;">Save payment accounts</button>
+      </form>
+      <div id="paymentAccountsMsg" class="error"></div>
+    </div>
   </section>
 </main>
 
@@ -838,7 +868,7 @@ function activateView(view, btn) {
   const tabs = document.querySelectorAll('.segmented button');
   const target = btn || tabs[view === 'admin' ? 1 : 0];
   if (target) target.classList.add('active');
-  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); loadHandovers(); }
+  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); loadHandovers(); loadPaymentAccounts(state.adminToken); }
 }
 
 function openAdminGate() {
@@ -952,6 +982,7 @@ function toggleReference() {
   const isCash = $('paymentMethod').value === 'Cash';
   $('referenceGroup').classList.toggle('hidden', isCash);
   if (isCash) $('momoRef').value = '';
+  renderPayAccount();
 }
 
 function showFormError(msg) { $('formError').textContent = msg; }
@@ -1174,6 +1205,7 @@ async function loadTaxpayers() {
       zone: r.zone, rate: Number(r.standard_rate),
       address: r.address, latitude: r.latitude, longitude: r.longitude, photoPath: r.photo_path
     }));
+    loadPaymentAccounts(token);
   } catch (err) {
     // keep the current list
   }
@@ -1805,6 +1837,77 @@ async function reviewHandover(id, status) {
     alert('Could not update this handover. Please try again.');
   }
 }
+
+/* ---------- Council payment accounts ---------- */
+let paymentAccounts = {};
+
+async function loadPaymentAccounts(token) {
+  const auth = token || state.adminToken;
+  if (!auth) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/payment_accounts?select=method,account_number,account_name', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + auth }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    paymentAccounts = {};
+    rows.forEach(r => { paymentAccounts[r.method] = { number: r.account_number, name: r.account_name }; });
+    renderPayAccount();
+    fillPaymentAccountsForm();
+  } catch (err) {
+    // keep the last values shown
+  }
+}
+
+function renderPayAccount() {
+  const box = $('payAccount');
+  const method = $('paymentMethod').value;
+  if (method === 'Cash') { box.classList.add('hidden'); return; }
+  const acc = paymentAccounts[method];
+  box.classList.remove('hidden');
+  box.innerHTML = acc
+    ? '<div class="meta">Ask the taxpayer to pay ' + esc(method) + ' to</div>' +
+      '<div class="biz">' + esc(acc.number) + '</div>' +
+      '<div class="meta">Account name · ' + esc(acc.name) + '</div>'
+    : '<div class="meta">No ' + esc(method) + ' number has been set yet. Ask the administrator before taking this payment.</div>';
+}
+
+function fillPaymentAccountsForm() {
+  const om = paymentAccounts['Orange Money'] || {};
+  const am = paymentAccounts['Africell Money'] || {};
+  $('omNumber').value = om.number || '';
+  $('omName').value = om.name || '';
+  $('amNumber').value = am.number || '';
+  $('amName').value = am.name || '';
+}
+
+$('paymentAccountsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('paymentAccountsMsg');
+  const rows = [
+    { method: 'Orange Money', account_number: $('omNumber').value.trim(), account_name: $('omName').value.trim() },
+    { method: 'Africell Money', account_number: $('amNumber').value.trim(), account_name: $('amName').value.trim() }
+  ];
+  if (rows.some(r => !r.account_number || !r.account_name)) {
+    msg.textContent = 'Enter the number and account name for both providers.';
+    return;
+  }
+  msg.textContent = 'Saving…';
+  try {
+    const now = new Date().toISOString();
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/payment_accounts?on_conflict=method', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows.map(r => ({ ...r, updated_at: now })))
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) { msg.textContent = 'Could not save. Try again.'; return; }
+    msg.textContent = 'Payment accounts saved.';
+    loadPaymentAccounts(state.adminToken);
+  } catch (err) {
+    msg.textContent = 'Could not reach the server. Check your connection and try again.';
+  }
+});
 
 /* ---------- Initial render ---------- */
 function renderAll() { renderAdmin(); }
