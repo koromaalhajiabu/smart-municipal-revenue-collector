@@ -3,7 +3,7 @@
    - Never caches Supabase or other network requests; those always go to the network,
      and the app's own offline queue handles failed uploads. */
 
-const CACHE_NAME = 'smartmunicipal-v12';
+const CACHE_NAME = 'smartmunicipal-v13';
 const SHELL = [
   './',
   './index.html',

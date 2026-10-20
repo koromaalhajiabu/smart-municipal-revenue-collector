@@ -689,6 +689,47 @@
       </form>
       <div id="paymentAccountsMsg" class="error"></div>
     </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div class="card-head">
+        <div>
+          <h2>Business licences</h2>
+          <div class="card-sub" style="margin:4px 0 0;">Record licences issued to registered taxpayers. Licences expiring within 30 days are highlighted.</div>
+        </div>
+      </div>
+      <form id="licenceForm" class="toolbar" style="align-items:flex-end;">
+        <div class="form-group">
+          <label for="licTaxpayer">Taxpayer ID</label>
+          <input type="text" id="licTaxpayer" placeholder="TP-0004" required>
+        </div>
+        <div class="form-group">
+          <label for="licNumber">Licence number</label>
+          <input type="text" id="licNumber" required>
+        </div>
+        <div class="form-group">
+          <label for="licType">Licence type</label>
+          <input type="text" id="licType" placeholder="Business licence" required>
+        </div>
+        <div class="form-group">
+          <label for="licIssued">Issued on</label>
+          <input type="date" id="licIssued" required>
+        </div>
+        <div class="form-group">
+          <label for="licExpires">Expires on</label>
+          <input type="date" id="licExpires" required>
+        </div>
+        <button type="submit" class="btn-solid" style="height:44px;">Record licence</button>
+      </form>
+      <div id="licenceMsg" class="error"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Licence no.</th><th>Taxpayer</th><th>Type</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="licenceBody"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -875,7 +916,7 @@ function activateView(view, btn) {
   const tabs = document.querySelectorAll('.segmented button');
   const target = btn || tabs[view === 'admin' ? 1 : 0];
   if (target) target.classList.add('active');
-  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); loadHandovers(); loadPaymentAccounts(state.adminToken); }
+  if (view === 'admin') { renderAdmin(); loadServerLedger(); loadCollectors(); loadHandovers(); loadPaymentAccounts(state.adminToken); loadLicences(); }
 }
 
 function openAdminGate() {
@@ -1906,6 +1947,103 @@ function isWeakPassword(pw) {
   if (/^\d+$/.test(p) && p.length < 12) return true;
   if (/^[a-z]+$/.test(p) && p.length < 12) return true;
   return false;
+}
+
+/* ---------- Business licences ---------- */
+let licenceRows = [];
+
+function licenceStatus(l) {
+  if (l.status === 'revoked') return 'Revoked';
+  if (l.expires_on < localDateKey(new Date())) return 'Expired';
+  if (l.expires_on <= localDateKey(new Date(Date.now() + 30 * 86400000))) return 'Expires soon';
+  return 'Valid';
+}
+
+async function loadLicences() {
+  if (!state.adminToken) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/business_licences?select=*&order=expires_on.asc&limit=500', {
+      headers: { 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken }
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    licenceRows = await res.json();
+    renderLicences();
+  } catch (err) {
+    // keep the last list shown
+  }
+}
+
+function renderLicences() {
+  const body = $('licenceBody');
+  if (!licenceRows.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">No licences recorded yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = licenceRows.map(l => {
+    const st = licenceStatus(l);
+    const badge = st === 'Valid' ? 'badge-synced' : 'badge-pending';
+    const action = l.status === 'active'
+      ? '<button class="btn" onclick="revokeLicence(\'' + esc(l.id) + '\')">Revoke</button>'
+      : '';
+    return '<tr>' +
+      '<td><strong>' + esc(l.licence_no) + '</strong></td>' +
+      '<td>' + esc(l.taxpayer_id) + '</td>' +
+      '<td>' + esc(l.licence_type) + '</td>' +
+      '<td>' + esc(l.issued_on) + '</td>' +
+      '<td>' + esc(l.expires_on) + '</td>' +
+      '<td><span class="badge ' + badge + '">' + esc(st) + '</span></td>' +
+      '<td>' + action + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+$('licenceForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('licenceMsg');
+  const row = {
+    taxpayer_id: $('licTaxpayer').value.trim().toUpperCase(),
+    licence_no: $('licNumber').value.trim(),
+    licence_type: $('licType').value.trim(),
+    issued_on: $('licIssued').value,
+    expires_on: $('licExpires').value
+  };
+  if (!row.issued_on || !row.expires_on || row.expires_on <= row.issued_on) {
+    msg.textContent = 'The expiry date must be after the issue date.';
+    return;
+  }
+  msg.textContent = 'Recording licence…';
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/business_licences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(row)
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (res.status === 409) { msg.textContent = 'That licence number is already recorded, or the taxpayer ID was not found.'; return; }
+    if (!res.ok) { msg.textContent = 'Could not record the licence. Check the details and try again.'; return; }
+    msg.textContent = 'Licence ' + row.licence_no + ' recorded.';
+    $('licenceForm').reset();
+    loadLicences();
+  } catch (err) {
+    msg.textContent = 'Could not reach the server. Check your connection and try again.';
+  }
+});
+
+async function revokeLicence(id) {
+  if (!confirm('Revoke this licence? The record is kept, but it will show as revoked.')) return;
+  try {
+    const res = await fetch(CONFIG.supabaseUrl + '/rest/v1/business_licences?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'apikey': CONFIG.apiKey, 'Authorization': 'Bearer ' + state.adminToken, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: 'revoked' })
+    });
+    if (res.status === 401) return adminSessionEnded();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    loadLicences();
+  } catch (err) {
+    alert('Could not revoke this licence. Please try again.');
+  }
 }
 
 /* ---------- Council payment accounts ---------- */
