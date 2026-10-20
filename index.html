@@ -707,7 +707,10 @@
       <p>Business <span id="resBusiness"></span></p>
       <p>Levy <span id="resLevy"></span></p>
       <p>Amount <span id="resAmount"></span></p>
+      <p>Collector <span id="resCollector"></span></p>
+      <p>Stall <span id="resStall"></span></p>
       <p>Method <span id="resMethod"></span></p>
+      <p id="resAccountRow" class="hidden">Paid to <span id="resAccount"></span></p>
       <p>Time <span id="resTime"></span></p>
       <span class="sync-note" id="resSync"></span>
     </div>
@@ -1073,7 +1076,12 @@ function showReceipt(tx) {
   $('resBusiness').textContent = tx.business;
   $('resLevy').textContent = tx.levy;
   $('resAmount').textContent = fmt(tx.amount);
+  $('resCollector').textContent = (tx.collectorId || '—') + (state.collector ? ' · ' + state.collector.name : '');
+  $('resStall').textContent = tx.stall || '—';
   $('resMethod').textContent = tx.method + (tx.reference ? ' · ' + tx.reference : '');
+  const acc = paymentAccounts[tx.method];
+  $('resAccountRow').classList.toggle('hidden', !acc);
+  if (acc) $('resAccount').textContent = acc.number + ' (' + acc.name + ')';
   $('resTime').textContent = fmtDateTime(tx.createdAt);
   $('resSync').textContent = tx.syncStatus === 'synced'
     ? 'Saved to the council server.'
